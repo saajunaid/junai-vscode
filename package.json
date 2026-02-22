@@ -1,14 +1,14 @@
 {
   "name": "junai",
-  "displayName": "junai — Agent Pipeline",
-  "description": "Drop-in agentic pipelines for any project. From idea to shipped — deterministic, auditable, autonomous.",
-  "version": "0.0.2",
+  "displayName": "junai — Agentic Pipeline",
+  "description": "AI agent orchestration for GitHub Copilot. Deterministic pipeline automation with 23 agents — architect, implement, test, review. From idea to shipped, no hallucinated routing.",
+  "version": "0.0.3",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": ["Other"],
-  "keywords": ["agent", "pipeline", "ai", "copilot", "automation", "agentic", "junai"],
+  "keywords": ["agent", "pipeline", "ai", "copilot", "automation", "agentic", "junai", "orchestration", "workflow", "github-copilot", "ai-agents", "deterministic"],
   "icon": "icon.png",
   "repository": {
     "type": "git",
