@@ -1,6 +1,6 @@
-﻿# junai - Agentic Pipeline
+﻿# junai - AI Agent Pipeline
 
-> AI agent orchestration for GitHub Copilot. Deterministic pipeline automation with 23 agents - architect, implement, test, review. From idea to shipped, no hallucinated routing.
+> AI agent pipeline for GitHub Copilot. Agentic workflow automation with 23 role-scoped agents - architect, implement, test, review. Deterministic. Auditable. From idea to shipped.
 
 ## Quick Start
 
