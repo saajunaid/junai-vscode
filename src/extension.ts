@@ -10,6 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.init',    () => cmdInit(context)),
         vscode.commands.registerCommand('junai.status',  () => cmdStatus()),
         vscode.commands.registerCommand('junai.setMode', () => cmdSetMode()),
+        vscode.commands.registerCommand('junai.remove',  () => cmdRemove()),
     );
 
     // Welcome prompt — show once per workspace when the agent pool is not yet installed
@@ -193,6 +194,58 @@ async function cmdSetMode() {
     fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf8');
 
     vscode.window.showInformationMessage(`junai: Pipeline mode set to "${picked.label}".`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// junai.remove — remove agent pool + state from this project
+// ─────────────────────────────────────────────────────────────
+async function cmdRemove() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('junai: No workspace folder open.');
+        return;
+    }
+
+    const confirmed = await vscode.window.showWarningMessage(
+        'This will delete the junai agent pool (.github/agents, skills, prompts, instructions, agent-docs, plans, handoffs, tools, pipeline-state.json) and remove the MCP entry from .vscode/mcp.json. Your own code and commits are NOT affected.',
+        { modal: true },
+        'Remove junai from this project',
+        'Cancel',
+    );
+    if (confirmed !== 'Remove junai from this project') { return; }
+
+    const targetFolder = workspaceFolders[0].uri.fsPath;
+    const githubDir    = path.join(targetFolder, '.github');
+
+    // Pool directories installed by init
+    const poolDirs = [
+        'agents', 'skills', 'prompts', 'instructions',
+        'agent-docs', 'plans', 'handoffs', 'tools',
+    ];
+    for (const dir of poolDirs) {
+        const p = path.join(githubDir, dir);
+        if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); }
+    }
+
+    // Root files installed by init
+    for (const file of ['pipeline-state.json', 'copilot-instructions.md', 'project-config.md']) {
+        const p = path.join(githubDir, file);
+        if (fs.existsSync(p)) { fs.rmSync(p, { force: true }); }
+    }
+
+    // Remove junai entry from .vscode/mcp.json without deleting the whole file
+    const mcpFile = path.join(targetFolder, '.vscode', 'mcp.json');
+    if (fs.existsSync(mcpFile)) {
+        try {
+            const cfg = JSON.parse(fs.readFileSync(mcpFile, 'utf8'));
+            if (cfg.servers && cfg.servers['junai']) {
+                delete cfg.servers['junai'];
+                fs.writeFileSync(mcpFile, JSON.stringify(cfg, null, 2), 'utf8');
+            }
+        } catch { /* leave mcp.json untouched if unreadable */ }
+    }
+
+    vscode.window.showInformationMessage('junai: Agent pool removed from this project. Re-run Initialize to restore it.');
 }
 
 // ─────────────────────────────────────────────────────────────

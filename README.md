@@ -38,6 +38,7 @@ A `.vscode/mcp.json` entry for the `junai` MCP server is added automatically (re
 | `junai: Initialize Agent Pipeline` | Install agent pool into `.github/` and configure MCP server |
 | `junai: Show Pipeline Status` | Display current stage, mode, and gate status |
 | `junai: Set Pipeline Mode` | Switch pipeline mode without re-initialising |
+| `junai: Remove from this project` | Delete the agent pool and MCP config from this project |
 
 ---
 

@@ -24,7 +24,6 @@ const POOL_DIRS = [
     'skills',
     'prompts',
     'instructions',
-    'diagrams',
     'agent-docs',
     'plans',
     'handoffs',
@@ -88,6 +87,10 @@ if (!source) {
 }
 console.log(`   Source : ${source}\n`);
 
+// Clear pool/ before copying to remove stale content from previous bundles
+if (fs.existsSync(poolDir)) {
+    fs.rmSync(poolDir, { recursive: true, force: true });
+}
 fs.mkdirSync(poolDir, { recursive: true });
 
 let total = 0;
