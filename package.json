@@ -2,7 +2,7 @@
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
   "description": "AI agent pipeline for GitHub Copilot. Agentic workflow automation with 23 role-scoped agents - architect, implement, test, review. Deterministic. Auditable. From idea to shipped.",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.96.0"
@@ -10,6 +10,11 @@
   "categories": ["Other", "AI", "Chat"],
   "keywords": ["ai-pipeline", "agent-pipeline", "ai-agent", "agentic", "copilot-agent", "github-copilot", "multi-agent", "llm", "ai-workflow", "workflow-automation", "pipeline", "orchestration"],
   "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#0d0f14",
+    "theme": "dark"
+  },
+  "qna": "https://github.com/saajunaid/junai-vscode/issues",
   "repository": {
     "type": "git",
     "url": "https://github.com/saajunaid/junai-vscode"

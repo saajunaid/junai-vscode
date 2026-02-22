@@ -12,4 +12,5 @@ tsconfig.json
 !out/**/*.js
 icon-source.svg
 icon2.png
+icon.gif
 node_modules/**
