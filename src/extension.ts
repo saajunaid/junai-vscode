@@ -11,6 +11,34 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.status',  () => cmdStatus()),
         vscode.commands.registerCommand('junai.setMode', () => cmdSetMode()),
     );
+
+    // Welcome prompt — show once per workspace when the agent pool is not yet installed
+    promptWelcomeIfNeeded(context);
+}
+
+function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) { return; }
+
+    const agentsDir = path.join(workspaceFolders[0].uri.fsPath, '.github', 'agents');
+    if (fs.existsSync(agentsDir)) { return; }   // already initialised — stay silent
+
+    // Only prompt once per workspace (suppress if user dismissed before)
+    const storageKey = `junai.welcomed.${workspaceFolders[0].uri.fsPath}`;
+    if (context.workspaceState.get<boolean>(storageKey)) { return; }
+
+    vscode.window.showInformationMessage(
+        'junai: Agent pipeline not yet set up in this project. Run Initialize to install 23 agents, skills, and MCP config.',
+        'Initialize Now',
+        'Not Now',
+    ).then(choice => {
+        if (choice === 'Initialize Now') {
+            vscode.commands.executeCommand('junai.init');
+        } else {
+            // Mark as dismissed so we don't prompt again for this workspace
+            context.workspaceState.update(storageKey, true);
+        }
+    });
 }
 
 export function deactivate() {}
