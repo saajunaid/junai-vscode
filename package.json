@@ -2,13 +2,30 @@
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
   "description": "AI agent pipeline for GitHub Copilot. Agentic workflow automation with 23 role-scoped agents - architect, implement, test, review. Deterministic. Auditable. From idea to shipped.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "junai-labs",
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.101.0"
   },
-  "categories": ["Other", "AI", "Chat"],
-  "keywords": ["ai-pipeline", "agent-pipeline", "ai-agent", "agentic", "copilot-agent", "github-copilot", "multi-agent", "llm", "ai-workflow", "workflow-automation", "pipeline", "orchestration"],
+  "categories": [
+    "Other",
+    "AI",
+    "Chat"
+  ],
+  "keywords": [
+    "ai-pipeline",
+    "agent-pipeline",
+    "ai-agent",
+    "agentic",
+    "copilot-agent",
+    "github-copilot",
+    "multi-agent",
+    "llm",
+    "ai-workflow",
+    "workflow-automation",
+    "pipeline",
+    "orchestration"
+  ],
   "icon": "icon.png",
   "galleryBanner": {
     "color": "#0d0f14",
@@ -27,12 +44,12 @@
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {
-    "mcpServers": {
-      "junai": {
-        "command": "uvx",
-        "args": ["junai-mcp"]
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "junai",
+        "label": "junai MCP Server"
       }
-    },
+    ],
     "commands": [
       {
         "command": "junai.init",
@@ -65,7 +82,11 @@
       "properties": {
         "junai.defaultMode": {
           "type": "string",
-          "enum": ["supervised", "assisted", "autopilot"],
+          "enum": [
+            "supervised",
+            "assisted",
+            "autopilot"
+          ],
           "default": "supervised",
           "description": "Default pipeline mode for new projects. supervised = all gates manual; assisted = manual gates with AI hints; autopilot = all gates auto-satisfied except intent_approved."
         }
@@ -83,7 +104,7 @@
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.80.0",
+    "@types/vscode": "^1.101.0",
     "@vscode/vsce": "^3.0.0",
     "typescript": "^5.3.0"
   }

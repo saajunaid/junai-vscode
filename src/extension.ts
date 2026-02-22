@@ -14,6 +14,20 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.update',  () => cmdUpdate(context)),
     );
 
+    // Register junai-mcp as an MCP server definition provider (VS Code 1.102+)
+    // Uses dynamic check so the extension still works on older VS Code versions.
+    const lm = vscode.lm as any;
+    if (typeof lm.registerMcpServerDefinitionProvider === 'function') {
+        const McpStdio = (vscode as any).McpStdioServerDefinition;
+        context.subscriptions.push(
+            lm.registerMcpServerDefinitionProvider('junai', {
+                provideMcpServerDefinitions: (_token: any) => [
+                    new McpStdio('junai MCP Server', 'uvx', ['junai-mcp'])
+                ]
+            })
+        );
+    }
+
     // Welcome prompt — show once per workspace when the agent pool is not yet installed
     promptWelcomeIfNeeded(context);
 }
