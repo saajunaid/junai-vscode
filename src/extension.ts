@@ -11,6 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.status',  () => cmdStatus()),
         vscode.commands.registerCommand('junai.setMode', () => cmdSetMode()),
         vscode.commands.registerCommand('junai.remove',  () => cmdRemove()),
+        vscode.commands.registerCommand('junai.update',  () => cmdUpdate(context)),
     );
 
     // Welcome prompt — show once per workspace when the agent pool is not yet installed
@@ -196,9 +197,9 @@ async function cmdSetMode() {
     vscode.window.showInformationMessage(`junai: Pipeline mode set to "${picked.label}".`);
 }
 
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 // junai.remove — remove agent pool + state from this project
-// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
 async function cmdRemove() {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
@@ -249,10 +250,76 @@ async function cmdRemove() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Helpers
+// junai.update — overwrite pool files with latest from extension bundle
+// ─────────────────────────────────────────────────────────────────────────────
+async function cmdUpdate(context: vscode.ExtensionContext) {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('junai: No workspace folder open.');
+        return;
+    }
+
+    const githubDir = path.join(workspaceFolders[0].uri.fsPath, '.github');
+    const agentsDir = path.join(githubDir, 'agents');
+    if (!fs.existsSync(agentsDir)) {
+        vscode.window.showErrorMessage('junai: Pipeline not initialized in this project. Run Initialize first.');
+        return;
+    }
+
+    const confirmed = await vscode.window.showInformationMessage(
+        'Update agent pool with latest files from this extension version? ' +
+        'Your pipeline-state.json and project-config.md will NOT be touched.',
+        { modal: true },
+        'Update',
+        'Cancel',
+    );
+    if (confirmed !== 'Update') { return; }
+
+    const poolDir = path.join(context.extensionPath, 'pool');
+
+    // Files that belong to the user — never overwrite
+    const USER_OWNED = new Set(['pipeline-state.json', 'project-config.md']);
+
+    let updated = 0;
+    let skipped = 0;
+
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'junai', cancellable: false },
+        async (progress) => {
+            progress.report({ message: 'Updating agent pool…' });
+
+            const poolDirs = ['agents', 'skills', 'prompts', 'instructions', 'agent-docs', 'plans', 'handoffs', 'tools'];
+            for (const dir of poolDirs) {
+                const src  = path.join(poolDir, dir);
+                const dest = path.join(githubDir, dir);
+                if (!fs.existsSync(src)) { continue; }
+                const counts = mergeDirSync(src, dest, USER_OWNED);
+                updated += counts.updated;
+                skipped += counts.skipped;
+            }
+
+            // Update root pool files (not user-owned ones)
+            for (const file of ['copilot-instructions.md']) {
+                const src  = path.join(poolDir, file);
+                const dest = path.join(githubDir, file);
+                if (fs.existsSync(src) && !USER_OWNED.has(file)) {
+                    fs.copyFileSync(src, dest);
+                    updated++;
+                }
+            }
+
+            progress.report({ message: 'Done.' });
+        }
+    );
+
+    vscode.window.showInformationMessage(
+        `✅ junai pool updated — ${updated} files refreshed, ${skipped} user-owned files preserved.`
+    );
+}
 // ─────────────────────────────────────────────────────────────
 const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.DS_Store']);
 
+// copyDirSync — full overwrite, used by init
 function copyDirSync(src: string, dest: string): void {
     if (!fs.existsSync(src)) { return; }
     fs.mkdirSync(dest, { recursive: true });
@@ -266,6 +333,28 @@ function copyDirSync(src: string, dest: string): void {
             fs.copyFileSync(srcPath, destPath);
         }
     }
+}
+
+// mergeDirSync — overwrites existing files, skips user-owned filenames, used by update
+function mergeDirSync(src: string, dest: string, userOwned: Set<string>): { updated: number; skipped: number } {
+    let updated = 0; let skipped = 0;
+    if (!fs.existsSync(src)) { return { updated, skipped }; }
+    fs.mkdirSync(dest, { recursive: true });
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        if (SKIP.has(entry.name)) { continue; }
+        const srcPath  = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+            const sub = mergeDirSync(srcPath, destPath, userOwned);
+            updated += sub.updated; skipped += sub.skipped;
+        } else if (userOwned.has(entry.name)) {
+            skipped++;
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+            updated++;
+        }
+    }
+    return { updated, skipped };
 }
 
 function scaffoldMcpConfig(targetFolder: string): void {
