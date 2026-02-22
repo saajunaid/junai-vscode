@@ -1,0 +1,13 @@
+# Files excluded from the packaged .vsix (excluded = not shipped to users)
+.vscode/**
+.vscode-test/**
+out/maps/**
+src/**
+scripts/**
+.gitignore
+.eslintrc.json
+tsconfig.json
+**/*.map
+**/*.ts
+!out/**/*.js
+node_modules/**
