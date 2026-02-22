@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Background with rounded corners -->
+  <rect width="128" height="128" rx="18" ry="18" fill="#0d0f14"/>
+
+  <!-- Subtle inner glow behind ring -->
+  <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#1a2035" stop-opacity="1"/>
+    <stop offset="100%" stop-color="#0d0f14" stop-opacity="1"/>
+  </radialGradient>
+  <circle cx="64" cy="64" r="58" fill="url(#centerGlow)"/>
+
+  <!-- Outer orbital ring -->
+  <circle cx="64" cy="64" r="50" fill="none" stroke="#2a2f42" stroke-width="1"/>
+
+  <!-- Inner orbital ring (subtle) -->
+  <circle cx="64" cy="64" r="38" fill="none" stroke="#1e2235" stroke-width="0.75"/>
+
+  <!-- Orbital arc top-right: flows clockwise from top node → right node, arrow at end -->
+  <path d="M 64 14 A 50 50 0 0 1 114 64" fill="none" stroke="#c8cfe0" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Arrow head at right node (114,64) — tangent points downward -->
+  <polygon points="110,58 114,65 118,58" fill="#c8cfe0"/>
+
+  <!-- Orbital arc bottom-left: flows clockwise from bottom node → left node, arrow at end -->
+  <path d="M 64 114 A 50 50 0 0 1 14 64" fill="none" stroke="#c8cfe0" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Arrow head at left node (14,64) — tangent points upward -->
+  <polygon points="10,70 14,63 18,70" fill="#c8cfe0"/>
+
+  <!-- Glowing nodes — only at arc start points (top and bottom); arrow tips replace right and left -->
+  <!-- Top -->
+  <circle cx="64" cy="14" r="4" fill="#ffffff" filter="url(#glow)"/>
+  <!-- Bottom -->
+  <circle cx="64" cy="114" r="4" fill="#ffffff" filter="url(#glow)"/>
+
+  <!-- Glow filter -->
+  <defs>
+    <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="textGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Dark center disc -->
+  <circle cx="64" cy="58" r="30" fill="#0a0c11"/>
+
+  <!-- Main text: junai — bold, large -->
+  <text x="64" y="63"
+    font-family="'Courier New', Courier, monospace"
+    font-size="22"
+    font-weight="700"
+    fill="#ffffff"
+    text-anchor="middle"
+    filter="url(#textGlow)"
+    letter-spacing="1">junai</text>
+
+  <!-- Subtext: LABS — small caps, spaced -->
+  <text x="64" y="76"
+    font-family="'Courier New', Courier, monospace"
+    font-size="10"
+    font-weight="400"
+    fill="#8892a4"
+    text-anchor="middle"
+    letter-spacing="3">LABS</text>
+</svg>

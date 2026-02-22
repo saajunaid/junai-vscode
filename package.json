@@ -2,7 +2,7 @@
   "name": "junai",
   "displayName": "junai — Agentic Pipeline",
   "description": "AI agent orchestration for GitHub Copilot. Deterministic pipeline automation with 23 agents — architect, implement, test, review. From idea to shipped, no hallucinated routing.",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.80.0"
