@@ -2,7 +2,7 @@
   "name": "junai",
   "displayName": "junai — Agent Pipeline",
   "description": "Drop-in agentic pipelines for any project. From idea to shipped — deterministic, auditable, autonomous.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.80.0"

@@ -73,12 +73,15 @@ async function cmdInit(context: vscode.ExtensionContext) {
             progress.report({ message: 'Scaffolding pipeline state…' });
             scaffoldPipelineState(githubDir, mode);
 
+            progress.report({ message: 'Configuring MCP server…' });
+            scaffoldMcpConfig(targetFolder);
+
             progress.report({ message: 'Done.' });
         }
     );
 
     const open = await vscode.window.showInformationMessage(
-        `✅ junai agent pipeline installed (mode: ${mode}). Open ARTIFACTS.md to get started.`,
+        `✅ junai agent pipeline installed (mode: ${mode}). MCP server configured in .vscode/mcp.json. Open ARTIFACTS.md to get started.`,
         'Open ARTIFACTS.md', 'Dismiss'
     );
     if (open === 'Open ARTIFACTS.md') {
@@ -181,6 +184,28 @@ function copyDirSync(src: string, dest: string): void {
         } else {
             fs.copyFileSync(srcPath, destPath);
         }
+    }
+}
+
+function scaffoldMcpConfig(targetFolder: string): void {
+    const vscodedir = path.join(targetFolder, '.vscode');
+    const mcpFile   = path.join(vscodedir, 'mcp.json');
+    fs.mkdirSync(vscodedir, { recursive: true });
+
+    let config: { servers?: Record<string, unknown> } = {};
+    if (fs.existsSync(mcpFile)) {
+        try { config = JSON.parse(fs.readFileSync(mcpFile, 'utf8')); } catch { config = {}; }
+    }
+    if (!config.servers) { config.servers = {}; }
+
+    // Only write if no junai entry already exists — never overwrite a user's custom config
+    if (!config.servers['junai']) {
+        config.servers['junai'] = {
+            type: 'stdio',
+            command: 'uvx',
+            args: ['junai-mcp'],
+        };
+        fs.writeFileSync(mcpFile, JSON.stringify(config, null, 2), 'utf8');
     }
 }
 
