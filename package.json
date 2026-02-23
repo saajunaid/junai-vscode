@@ -2,7 +2,7 @@
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
   "description": "AI agent pipeline for GitHub Copilot. Agentic workflow automation with 23 role-scoped agents - architect, implement, test, review. Deterministic. Auditable. From idea to shipped.",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.101.0"

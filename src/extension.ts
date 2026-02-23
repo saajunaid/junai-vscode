@@ -477,33 +477,43 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
             if (dispatchKey === lastDispatchedKey) { return; }
             lastDispatchedKey = dispatchKey;
 
-            const stage  = (decision.next_stage as string) ?? '?';
-            const agent  = (decision.agent      as string) ?? '?';
-            const prompt = (decision.prompt      as string) ?? '';
+            const stage       = (decision.next_stage   as string) ?? '?';
+            const targetAgent = (decision.target_agent as string) ?? 'None';
+            const prompt      = (decision.handoff_prompt as string) ?? (decision.prompt as string) ?? '';
 
             channel.show(false);
             channel.appendLine(`\n[junai autopilot] 🚀 ${new Date().toISOString()}`);
-            channel.appendLine(`  stage  : ${stage}`);
-            channel.appendLine(`  agent  : ${agent}`);
-            channel.appendLine(`  prompt : ${prompt.length} chars`);
+            channel.appendLine(`  stage        : ${stage}`);
+            channel.appendLine(`  target_agent : ${targetAgent}`);
+            channel.appendLine(`  prompt       : ${prompt.length} chars`);
 
-            // Step 1 — open the agent chat session
-            const openCmd = agentOpenCommand(agent);
-            const openOk  = await tryExecuteCommand(channel, openCmd);
-
-            if (!openOk) {
-                // Agent open command not found — name mismatch or agent not registered
-                channel.appendLine(`  ✗ Could not open @${agent} via: ${openCmd}`);
-                channel.appendLine(`  → Manual fallback: open @${agent} and paste the routing prompt.`);
-                await vscode.env.clipboard.writeText(prompt);
-                vscode.window.showWarningMessage(
-                    `junai autopilot: could not auto-open @${agent}. Routing prompt copied to clipboard.`,
+            // Pipeline closed — no agent to route to
+            if (!targetAgent || targetAgent === 'None') {
+                channel.appendLine(`  ✅ Pipeline reached closed state — no further routing needed.`);
+                vscode.window.showInformationMessage(
+                    `junai autopilot: ✅ Pipeline closed — ${state.feature ?? 'feature'} complete.`,
                     'View Log'
                 ).then(c => { if (c === 'View Log') { channel.show(true); } });
                 return;
             }
 
-            channel.appendLine(`  ✓ Opened @${agent}`);
+            // Step 1 — open the agent chat session
+            const openCmd = agentOpenCommand(targetAgent);
+            const openOk  = await tryExecuteCommand(channel, openCmd);
+
+            if (!openOk) {
+                // Agent open command not found — name mismatch or agent not registered
+                channel.appendLine(`  ✗ Could not open @${targetAgent} via: ${openCmd}`);
+                channel.appendLine(`  → Manual fallback: open @${targetAgent} and paste the routing prompt.`);
+                await vscode.env.clipboard.writeText(prompt);
+                vscode.window.showWarningMessage(
+                    `junai autopilot: could not auto-open @${targetAgent}. Routing prompt copied to clipboard.`,
+                    'View Log'
+                ).then(c => { if (c === 'View Log') { channel.show(true); } });
+                return;
+            }
+
+            channel.appendLine(`  ✓ Opened @${targetAgent}`);
 
             // Step 2 — wait for chat panel to settle, then send routing prompt
             await delay(700);
@@ -513,7 +523,7 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
             if (sendOk) {
                 channel.appendLine(`  ✓ Routing prompt sent`);
                 vscode.window.showInformationMessage(
-                    `junai autopilot: ✅ @${agent} invoked — stage: ${stage}`,
+                    `junai autopilot: ✅ @${targetAgent} invoked — stage: ${stage}`,
                     'View Log'
                 ).then(c => { if (c === 'View Log') { channel.show(true); } });
             } else {
@@ -521,7 +531,7 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
                 await vscode.env.clipboard.writeText(prompt);
                 channel.appendLine(`  ⚠ steerWithMessage not available — prompt copied to clipboard`);
                 vscode.window.showInformationMessage(
-                    `junai autopilot: @${agent} opened. Paste routing prompt to send (Ctrl+V).`,
+                    `junai autopilot: @${targetAgent} opened. Paste routing prompt to send (Ctrl+V).`,
                     'View Log'
                 ).then(c => { if (c === 'View Log') { channel.show(true); } });
             }
