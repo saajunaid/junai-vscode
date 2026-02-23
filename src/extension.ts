@@ -488,10 +488,19 @@ async function cmdProbeAutopilot(): Promise<void> {
 
     channel.appendLine('');
     channel.appendLine('--- lm API surface (1.102 probe) ---');
-    const lm = vscode.lm as any;
-    const lmKeys = Object.keys(lm).filter(k => /chat|agent|send|request|mcp/i.test(k));
-    for (const k of lmKeys) {
-        channel.appendLine(`  vscode.lm.${k} : ${typeof lm[k]}`);
+    try {
+        const lm = vscode.lm as any;
+        const lmKeys = Object.keys(lm).filter(k => /chat|agent|send|request|mcp/i.test(k));
+        for (const k of lmKeys) {
+            channel.appendLine(`  vscode.lm.${k} : ${typeof lm[k]}`);
+        }
+        if (lmKeys.length === 0) {
+            channel.appendLine('  (no matching keys found on vscode.lm)');
+        }
+    } catch (e: any) {
+        channel.appendLine(`  ⚠ Could not enumerate vscode.lm: ${e?.message ?? e}`);
+        channel.appendLine('  Add enabledApiProposals=["mcpServerDefinitions"] to package.json and use --enable-proposed-api flag,');
+        channel.appendLine('  or run via F5 (Extension Development Host) to access proposed APIs.');
     }
 
     channel.appendLine('');
