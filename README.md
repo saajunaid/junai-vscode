@@ -20,7 +20,7 @@
 
 <div align="center">
 
-**[🗺️ View Full Pipeline Poster →](https://github.com/saajunaid/junai/blob/main/.github/diagrams/agent-pipeline-poster.svg)**
+![junai AI Agent Pipeline — 22 agents, 3 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
 
 *22 agents · 3 model tiers · full handoff map*
 
@@ -56,7 +56,7 @@ Idea → Intent → PRD → Architecture → Plan → Implement → Test → Rev
 
 ## 🚀 Three Pipeline Modes
 
-**[▶ View Pipeline Modes Reference Card →](https://github.com/saajunaid/junai/blob/main/.github/diagrams/advisory-hub-mode.svg)**
+![junai Pipeline Modes — supervised, assisted, autopilot](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-modes.png)
 
 | Mode | How it works | Best for |
 |---|---|---|
