@@ -34,6 +34,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Welcome prompt — show once per workspace when the agent pool is not yet installed
     promptWelcomeIfNeeded(context);
+
+    // Auto-update nudge — notify when workspace pool is behind the installed extension
+    checkPoolUpdate(context);
 }
 
 function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
@@ -123,6 +126,9 @@ async function cmdInit(context: vscode.ExtensionContext) {
 
             progress.report({ message: 'Configuring MCP server…' });
             scaffoldMcpConfig(targetFolder);
+
+            // Write pool version marker so activation check knows workspace is current
+            writeWorkspacePoolVersion(context, githubDir);
 
             progress.report({ message: 'Done.' });
         }
@@ -247,7 +253,7 @@ async function cmdRemove() {
     }
 
     // Root files installed by init
-    for (const file of ['pipeline-state.json', 'copilot-instructions.md', 'project-config.md']) {
+    for (const file of ['pipeline-state.json', 'copilot-instructions.md', 'project-config.md', '.junai-pool-version']) {
         const p = path.join(githubDir, file);
         if (fs.existsSync(p)) { fs.rmSync(p, { force: true }); }
     }
@@ -325,6 +331,9 @@ async function cmdUpdate(context: vscode.ExtensionContext) {
                     updated++;
                 }
             }
+
+            // Write pool version marker so activation check knows workspace is current
+            writeWorkspacePoolVersion(context, githubDir);
 
             progress.report({ message: 'Done.' });
         }
@@ -488,6 +497,61 @@ async function cmdProbeAutopilot(): Promise<void> {
     channel.appendLine('');
     channel.appendLine('Paste this output as context when implementing the real autopilot invoker.');
     vscode.window.showInformationMessage(`junai probe: found ${relevant.length} chat commands. See "junai Autopilot Probe" output channel.`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pool version helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Version baked into the extension bundle at publish time. */
+function readBundledPoolVersion(context: vscode.ExtensionContext): string | null {
+    const f = path.join(context.extensionPath, 'pool', 'POOL_VERSION');
+    try { return fs.readFileSync(f, 'utf8').trim(); } catch { return null; }
+}
+
+/** Version last written into the workspace .github/ directory. */
+function readWorkspacePoolVersion(githubDir: string): string | null {
+    const f = path.join(githubDir, '.junai-pool-version');
+    try { return fs.readFileSync(f, 'utf8').trim(); } catch { return null; }
+}
+
+/** Stamp the workspace so future activation checks know it's up to date. */
+function writeWorkspacePoolVersion(context: vscode.ExtensionContext, githubDir: string): void {
+    const v = readBundledPoolVersion(context);
+    if (!v) { return; }
+    fs.writeFileSync(path.join(githubDir, '.junai-pool-version'), v, 'utf8');
+}
+
+/**
+ * On activation, compare bundled pool version against workspace pool version.
+ * If bundled > workspace, show a one-click update nudge.
+ * Suppressed if workspace isn't initialised yet (no agents/ dir).
+ */
+function checkPoolUpdate(context: vscode.ExtensionContext): void {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) { return; }
+
+    const githubDir  = path.join(workspaceFolders[0].uri.fsPath, '.github');
+    const agentsDir  = path.join(githubDir, 'agents');
+    if (!fs.existsSync(agentsDir)) { return; }  // not initialised — welcome prompt handles it
+
+    const bundled   = readBundledPoolVersion(context);
+    const workspace = readWorkspacePoolVersion(githubDir);
+
+    if (!bundled) { return; }                    // old bundle without version marker — skip
+    if (bundled === workspace) { return; }        // already up to date
+
+    // Workspace is behind — nudge the user
+    const label = workspace
+        ? `junai agent pool update available: v${workspace} → v${bundled}`
+        : `junai agent pool update available (v${bundled})`;
+
+    vscode.window.showInformationMessage(label, 'Update Now', 'Later')
+        .then(choice => {
+            if (choice === 'Update Now') {
+                vscode.commands.executeCommand('junai.update');
+            }
+        });
 }
 
 function scaffoldPipelineState(githubDir: string, mode: string): void {

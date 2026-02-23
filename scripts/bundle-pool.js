@@ -112,4 +112,8 @@ for (const file of POOL_FILES) {
     }
 }
 
-console.log(`\n✅  Pool bundled — ${total} files written to pool/\n`);
+// Write version marker — used by extension to detect when workspace pool is stale
+const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+fs.writeFileSync(path.join(poolDir, 'POOL_VERSION'), pkg.version, 'utf8');
+
+console.log(`\n✅  Pool bundled — ${total} files written to pool/  [pool version: ${pkg.version}]\n`);
