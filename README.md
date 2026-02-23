@@ -86,8 +86,8 @@ Each agent is a deeply crafted instruction file in `.github/agents/` — scoped 
 | Tier | Agents | Model |
 |---|---|---|
 | 🔵 **Deep Reasoning** | Architect, PRD, Plan, SQL Expert, Security Analyst, Data Engineer, Debug, UX Designer, UI/UX Designer | Claude Opus 4.6 |
-| 🟢 **Multi-file Coding** | Implement, Frontend Developer, Streamlit Developer, DevOps, Tester | Claude Sonnet 4.6 |
-| 🟣 **Orchestration** | Orchestrator, Code Reviewer, Mentor, Janitor, Prompt Engineer, Mermaid Specialist, SVG Diagram, Accessibility | Claude Sonnet 4.6 |
+| ⚡ **Multi-file Coding** | Implement, Frontend Developer, Streamlit Developer, DevOps, Tester | Claude Sonnet 4.6 |
+| 🎯 **Orchestration** | Orchestrator, Code Reviewer, Mentor, Janitor, Prompt Engineer, Mermaid Specialist, SVG Diagram, Accessibility | Claude Sonnet 4.6 |
 
 All agents share a **handoff protocol** — each completion writes artefact paths and routing context into `pipeline-state.json`, so the Orchestrator can cold-start a new session from state alone.
 
@@ -140,7 +140,6 @@ One command. Everything below lands in your `.github/` folder and travels with y
 | `plans/` | Plan templates and backlog scaffold |
 | `agent-docs/` | ARTIFACTS hub, architecture, PRD, UX, security docs |
 | `handoffs/` | Cross-session context handoff protocol |
-| `diagrams/` | Pipeline diagrams and reference cards |
 
 Plus at the root level:
 - `pipeline-state.json` — live pipeline state (stage, mode, gates, routing decisions, artefact refs)
