@@ -8,6 +8,7 @@
 
 **The only structured, persistent, auditable multi-agent SDLC pipeline — purpose-built for GitHub Copilot.**
 
+[![Beta](https://img.shields.io/badge/status-beta-orange?style=flat-square)](https://github.com/saajunaid/junai-vscode)
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/junai-labs.junai?color=0066cc&label=marketplace&style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=junai-labs.junai)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/junai-labs.junai?color=0066cc&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=junai-labs.junai)
 [![License](https://img.shields.io/badge/license-MIT-22c55e?style=flat-square)](https://github.com/saajunaid/junai-vscode/blob/main/LICENSE)
