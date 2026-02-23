@@ -56,8 +56,6 @@ Idea → Intent → PRD → Architecture → Plan → Implement → Test → Rev
 
 ## 🚀 Three Pipeline Modes
 
-![junai Pipeline Modes — supervised, assisted, autopilot](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-modes.png)
-
 | Mode | How it works | Best for |
 |---|---|---|
 | 🎛️ **supervised** | Every gate requires your explicit approval before advancing | Learning the pipeline, high-stakes changes |
