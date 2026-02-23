@@ -407,17 +407,50 @@ function scaffoldMcpConfig(targetFolder: string): void {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// startAutopilotWatcher — DRY RUN PROBE
+// startAutopilotWatcher — real autopilot invoker
 // Watches pipeline-state.json. When pipeline_mode=autopilot AND _routing_decision
-// appears (pending + not blocked), fires a toast and logs to the output channel.
-// This proves the detection layer works before we wire up the real invocation.
+// appears (pending, not blocked), opens the target agent chat and sends the
+// routing prompt automatically — no user clicks required.
+//
+// VS Code generates workbench.action.chat.open<AgentName> for every .agent.md
+// whose frontmatter name: field matches. Confirmed via probe on VS Code 1.109.5.
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** A few agent names use slug form in the open command rather than verbatim name. */
+const AGENT_OPEN_OVERRIDES: Record<string, string> = {
+    'UI/UX Designer':                'ui-ux-designer',
+    'Mermaid Diagram Specialist':    'mermaid-diagram-specialist',
+};
+
+function agentOpenCommand(agentName: string): string {
+    const suffix = AGENT_OPEN_OVERRIDES[agentName] ?? agentName;
+    return `workbench.action.chat.open${suffix}`;
+}
+
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function tryExecuteCommand(
+    channel: vscode.OutputChannel,
+    command: string,
+    ...args: unknown[]
+): Promise<boolean> {
+    try {
+        await vscode.commands.executeCommand(command, ...args);
+        return true;
+    } catch {
+        channel.appendLine(`  ⚠ Command unavailable: ${command}`);
+        return false;
+    }
+}
+
 function startAutopilotWatcher(context: vscode.ExtensionContext): void {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) { return; }
 
-    const stateFile = vscode.Uri.file(
-        path.join(workspaceFolders[0].uri.fsPath, '.github', 'pipeline-state.json')
+    const stateFilePath = path.join(
+        workspaceFolders[0].uri.fsPath, '.github', 'pipeline-state.json'
     );
 
     const watcher = vscode.workspace.createFileSystemWatcher(
@@ -426,40 +459,80 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
 
     const channel = vscode.window.createOutputChannel('junai Autopilot');
 
-    const checkState = () => {
+    // Track last dispatched decision to deduplicate rapid file-change events
+    let lastDispatchedKey = '';
+
+    const checkState = async () => {
         try {
-            if (!fs.existsSync(stateFile.fsPath)) { return; }
-            const raw  = fs.readFileSync(stateFile.fsPath, 'utf8');
-            const state = JSON.parse(raw);
+            if (!fs.existsSync(stateFilePath)) { return; }
+            const state = JSON.parse(fs.readFileSync(stateFilePath, 'utf8'));
 
             const mode     = state.pipeline_mode as string | undefined;
             const decision = state._notes?._routing_decision as Record<string, unknown> | undefined;
 
-            if (mode === 'autopilot' && decision && !decision.blocked) {
-                const target = (decision.next_stage as string) ?? '?';
-                const agent  = (decision.agent      as string) ?? '?';
-                channel.show(false);
-                channel.appendLine(`[junai autopilot] 🚦 Routing decision detected`);
-                channel.appendLine(`  next_stage : ${target}`);
-                channel.appendLine(`  agent      : ${agent}`);
-                channel.appendLine(`  mode       : ${mode}`);
-                channel.appendLine(`  prompt_len : ${String((decision.prompt as string ?? '').length)} chars`);
-                channel.appendLine(`───────────────────────────────────────────────────`);
-                channel.appendLine(`  [DRY RUN] Would invoke @${agent} here. Run junai.probeAutopilot`);
-                channel.appendLine(`  to see which VS Code chat commands are available.`);
+            if (mode !== 'autopilot' || !decision || decision.blocked) { return; }
 
+            // Deduplicate: same stage + same last_updated = same decision already dispatched
+            const dispatchKey = `${decision.next_stage ?? ''}:${state.last_updated ?? ''}`;
+            if (dispatchKey === lastDispatchedKey) { return; }
+            lastDispatchedKey = dispatchKey;
+
+            const stage  = (decision.next_stage as string) ?? '?';
+            const agent  = (decision.agent      as string) ?? '?';
+            const prompt = (decision.prompt      as string) ?? '';
+
+            channel.show(false);
+            channel.appendLine(`\n[junai autopilot] 🚀 ${new Date().toISOString()}`);
+            channel.appendLine(`  stage  : ${stage}`);
+            channel.appendLine(`  agent  : ${agent}`);
+            channel.appendLine(`  prompt : ${prompt.length} chars`);
+
+            // Step 1 — open the agent chat session
+            const openCmd = agentOpenCommand(agent);
+            const openOk  = await tryExecuteCommand(channel, openCmd);
+
+            if (!openOk) {
+                // Agent open command not found — name mismatch or agent not registered
+                channel.appendLine(`  ✗ Could not open @${agent} via: ${openCmd}`);
+                channel.appendLine(`  → Manual fallback: open @${agent} and paste the routing prompt.`);
+                await vscode.env.clipboard.writeText(prompt);
+                vscode.window.showWarningMessage(
+                    `junai autopilot: could not auto-open @${agent}. Routing prompt copied to clipboard.`,
+                    'View Log'
+                ).then(c => { if (c === 'View Log') { channel.show(true); } });
+                return;
+            }
+
+            channel.appendLine(`  ✓ Opened @${agent}`);
+
+            // Step 2 — wait for chat panel to settle, then send routing prompt
+            await delay(700);
+
+            const sendOk = await tryExecuteCommand(channel, 'workbench.action.chat.steerWithMessage', prompt);
+
+            if (sendOk) {
+                channel.appendLine(`  ✓ Routing prompt sent`);
                 vscode.window.showInformationMessage(
-                    `junai autopilot: routing to @${agent} (${target}). [DRY RUN — watcher fired]`,
+                    `junai autopilot: ✅ @${agent} invoked — stage: ${stage}`,
+                    'View Log'
+                ).then(c => { if (c === 'View Log') { channel.show(true); } });
+            } else {
+                // steerWithMessage unavailable — copy prompt, ask user to paste
+                await vscode.env.clipboard.writeText(prompt);
+                channel.appendLine(`  ⚠ steerWithMessage not available — prompt copied to clipboard`);
+                vscode.window.showInformationMessage(
+                    `junai autopilot: @${agent} opened. Paste routing prompt to send (Ctrl+V).`,
                     'View Log'
                 ).then(c => { if (c === 'View Log') { channel.show(true); } });
             }
+
         } catch {
-            // malformed JSON mid-write — ignore
+            // malformed JSON mid-write — ignore, next save will retry
         }
     };
 
-    watcher.onDidChange(checkState);
-    watcher.onDidCreate(checkState);
+    watcher.onDidChange(() => { void checkState(); });
+    watcher.onDidCreate(() => { void checkState(); });
     context.subscriptions.push(watcher, channel);
 }
 
