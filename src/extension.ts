@@ -7,12 +7,16 @@ import * as path from 'path';
 // ─────────────────────────────────────────────────────────────
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
-        vscode.commands.registerCommand('junai.init',    () => cmdInit(context)),
-        vscode.commands.registerCommand('junai.status',  () => cmdStatus()),
-        vscode.commands.registerCommand('junai.setMode', () => cmdSetMode()),
-        vscode.commands.registerCommand('junai.remove',  () => cmdRemove()),
-        vscode.commands.registerCommand('junai.update',  () => cmdUpdate(context)),
+        vscode.commands.registerCommand('junai.init',            () => cmdInit(context)),
+        vscode.commands.registerCommand('junai.status',          () => cmdStatus()),
+        vscode.commands.registerCommand('junai.setMode',         () => cmdSetMode()),
+        vscode.commands.registerCommand('junai.remove',          () => cmdRemove()),
+        vscode.commands.registerCommand('junai.update',          () => cmdUpdate(context)),
+        vscode.commands.registerCommand('junai.probeAutopilot',  () => cmdProbeAutopilot()),
     );
+
+    // Start autopilot watcher — fires when pipeline-state.json routing_decision appears in autopilot
+    startAutopilotWatcher(context);
 
     // Register junai-mcp as an MCP server definition provider (VS Code 1.102+)
     // Uses dynamic check so the extension still works on older VS Code versions.
@@ -391,6 +395,99 @@ function scaffoldMcpConfig(targetFolder: string): void {
         };
         fs.writeFileSync(mcpFile, JSON.stringify(config, null, 2), 'utf8');
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// startAutopilotWatcher — DRY RUN PROBE
+// Watches pipeline-state.json. When pipeline_mode=autopilot AND _routing_decision
+// appears (pending + not blocked), fires a toast and logs to the output channel.
+// This proves the detection layer works before we wire up the real invocation.
+// ─────────────────────────────────────────────────────────────────────────────
+function startAutopilotWatcher(context: vscode.ExtensionContext): void {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) { return; }
+
+    const stateFile = vscode.Uri.file(
+        path.join(workspaceFolders[0].uri.fsPath, '.github', 'pipeline-state.json')
+    );
+
+    const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolders[0], '.github/pipeline-state.json')
+    );
+
+    const channel = vscode.window.createOutputChannel('junai Autopilot');
+
+    const checkState = () => {
+        try {
+            if (!fs.existsSync(stateFile.fsPath)) { return; }
+            const raw  = fs.readFileSync(stateFile.fsPath, 'utf8');
+            const state = JSON.parse(raw);
+
+            const mode     = state.pipeline_mode as string | undefined;
+            const decision = state._notes?._routing_decision as Record<string, unknown> | undefined;
+
+            if (mode === 'autopilot' && decision && !decision.blocked) {
+                const target = (decision.next_stage as string) ?? '?';
+                const agent  = (decision.agent      as string) ?? '?';
+                channel.show(false);
+                channel.appendLine(`[junai autopilot] 🚦 Routing decision detected`);
+                channel.appendLine(`  next_stage : ${target}`);
+                channel.appendLine(`  agent      : ${agent}`);
+                channel.appendLine(`  mode       : ${mode}`);
+                channel.appendLine(`  prompt_len : ${String((decision.prompt as string ?? '').length)} chars`);
+                channel.appendLine(`───────────────────────────────────────────────────`);
+                channel.appendLine(`  [DRY RUN] Would invoke @${agent} here. Run junai.probeAutopilot`);
+                channel.appendLine(`  to see which VS Code chat commands are available.`);
+
+                vscode.window.showInformationMessage(
+                    `junai autopilot: routing to @${agent} (${target}). [DRY RUN — watcher fired]`,
+                    'View Log'
+                ).then(c => { if (c === 'View Log') { channel.show(true); } });
+            }
+        } catch {
+            // malformed JSON mid-write — ignore
+        }
+    };
+
+    watcher.onDidChange(checkState);
+    watcher.onDidCreate(checkState);
+    context.subscriptions.push(watcher, channel);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// cmdProbeAutopilot — enumerate all available VS Code chat / copilot commands
+// Run this command from the Command Palette to see exactly what's available
+// for the real autopilot invocation implementation.
+// ─────────────────────────────────────────────────────────────────────────────
+async function cmdProbeAutopilot(): Promise<void> {
+    const channel = vscode.window.createOutputChannel('junai Autopilot Probe');
+    channel.show(true);
+    channel.appendLine('=== junai Autopilot Command Probe ===');
+    channel.appendLine(`VS Code version : ${vscode.version}`);
+    channel.appendLine('');
+
+    const allCommands = await vscode.commands.getCommands(true);
+    const relevant = allCommands
+        .filter(c => /chat|copilot|agent|handoff|send|message/i.test(c))
+        .sort();
+
+    channel.appendLine(`Found ${relevant.length} chat/copilot/agent commands:`);
+    channel.appendLine('');
+    for (const cmd of relevant) {
+        channel.appendLine(`  ${cmd}`);
+    }
+
+    channel.appendLine('');
+    channel.appendLine('--- lm API surface (1.102 probe) ---');
+    const lm = vscode.lm as any;
+    const lmKeys = Object.keys(lm).filter(k => /chat|agent|send|request|mcp/i.test(k));
+    for (const k of lmKeys) {
+        channel.appendLine(`  vscode.lm.${k} : ${typeof lm[k]}`);
+    }
+
+    channel.appendLine('');
+    channel.appendLine('Paste this output as context when implementing the real autopilot invoker.');
+    vscode.window.showInformationMessage(`junai probe: found ${relevant.length} chat commands. See "junai Autopilot Probe" output channel.`);
 }
 
 function scaffoldPipelineState(githubDir: string, mode: string): void {
