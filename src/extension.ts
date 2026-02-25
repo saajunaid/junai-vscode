@@ -116,6 +116,7 @@ async function cmdInit(context: vscode.ExtensionContext) {
 
             progress.report({ message: 'Configuring MCP server…' });
             scaffoldMcpConfig(targetFolder);
+            scaffoldVscodeSettings(targetFolder);
 
             // Write pool version marker so activation check knows workspace is current
             writeWorkspacePoolVersion(context, githubDir);
@@ -329,6 +330,10 @@ async function cmdUpdate(context: vscode.ExtensionContext) {
             // Write pool version marker so activation check knows workspace is current
             writeWorkspacePoolVersion(context, githubDir);
 
+            // Apply workspace settings fixes (idempotent — only sets if not already present)
+            scaffoldMcpConfig(workspaceFolders[0].uri.fsPath);
+            scaffoldVscodeSettings(workspaceFolders[0].uri.fsPath);
+
             progress.report({ message: 'Done.' });
         }
     );
@@ -411,6 +416,30 @@ function scaffoldMcpConfig(targetFolder: string): void {
             args: ['${workspaceFolder}/.github/tools/mcp-server/server.py'],
         };
         fs.writeFileSync(mcpFile, JSON.stringify(config, null, 2), 'utf8');
+    }
+}
+
+function scaffoldVscodeSettings(targetFolder: string): void {
+    // Adds workspace-level file exclusions cosmetically needed on Windows.
+    // The MCP server subprocess (Python / fastmcp + rich) opens the Windows NUL
+    // device using a relative path (os.devnull = 'nul') while cwd is the workspace
+    // root. Windows' ReadDirectoryChangesW watcher emits a phantom change event
+    // for "NUL", which VS Code shows as a file in the explorer even though the
+    // file doesn't actually exist. Adding NUL to files.exclude suppresses it.
+    const vscodedir     = path.join(targetFolder, '.vscode');
+    const settingsFile  = path.join(vscodedir, 'settings.json');
+    fs.mkdirSync(vscodedir, { recursive: true });
+
+    let settings: Record<string, unknown> = {};
+    if (fs.existsSync(settingsFile)) {
+        try { settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')); } catch { settings = {}; }
+    }
+
+    const exclude = (settings['files.exclude'] ?? {}) as Record<string, unknown>;
+    if (!exclude['NUL']) {
+        exclude['NUL'] = true;
+        settings['files.exclude'] = exclude;
+        fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 4), 'utf8');
     }
 }
 
