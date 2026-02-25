@@ -396,10 +396,19 @@ function scaffoldMcpConfig(targetFolder: string): void {
 
     // Only write if no junai entry already exists — never overwrite a user's custom config
     if (!config.servers['junai']) {
+        // Use the local server.py that ships with the pool (deployed to .github/tools/mcp-server/).
+        // This avoids the uvx-based PyPI approach (junai-mcp v0.1.x), which ran pipeline_runner
+        // via subprocess using the uvx-isolated Python — that env lacks pydantic and all
+        // workspace deps, so the subprocess always failed silently.
+        // The local server.py uses direct in-process imports, so no subprocess or dep issues.
+        // ${workspaceFolder} is resolved by VS Code at MCP startup time.
+        const pythonBin = process.platform === 'win32'
+            ? '${workspaceFolder}/.venv/Scripts/python.exe'
+            : '${workspaceFolder}/.venv/bin/python';
         config.servers['junai'] = {
             type: 'stdio',
-            command: 'uvx',
-            args: ['junai-mcp'],
+            command: pythonBin,
+            args: ['${workspaceFolder}/.github/tools/mcp-server/server.py'],
         };
         fs.writeFileSync(mcpFile, JSON.stringify(config, null, 2), 'utf8');
     }
@@ -424,10 +433,6 @@ const AGENT_OPEN_OVERRIDES: Record<string, string> = {
 function agentOpenCommand(agentName: string): string {
     const suffix = AGENT_OPEN_OVERRIDES[agentName] ?? agentName;
     return `workbench.action.chat.open${suffix}`;
-}
-
-function delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function tryExecuteCommand(
@@ -496,15 +501,24 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
                 return;
             }
 
-            // Step 1 — open the agent chat session
+            // Open the agent chat with the routing prompt as the initial query.
+            // workbench.action.chat.open<Name> accepts { query } on VS Code ≥1.99
+            // (agent-mode). This is more reliable than the old two-step approach of
+            // opening the agent and then calling steerWithMessage separately —
+            // steerWithMessage routes to a standalone quick-chat overlay, NOT to the
+            // agent's own chat panel, so the prompt was landing in the wrong session.
+            // The prompt is also copied to clipboard as a safety net in case the
+            // { query } arg is accepted but not honoured by a given VS Code build.
             const openCmd = agentOpenCommand(targetAgent);
-            const openOk  = await tryExecuteCommand(channel, openCmd);
+            const openOk  = await tryExecuteCommand(channel, openCmd, { query: prompt });
+
+            // Always put the prompt in clipboard regardless — user can Ctrl+V if needed
+            await vscode.env.clipboard.writeText(prompt);
 
             if (!openOk) {
                 // Agent open command not found — name mismatch or agent not registered
                 channel.appendLine(`  ✗ Could not open @${targetAgent} via: ${openCmd}`);
-                channel.appendLine(`  → Manual fallback: open @${targetAgent} and paste the routing prompt.`);
-                await vscode.env.clipboard.writeText(prompt);
+                channel.appendLine(`  → Manual fallback: open @${targetAgent} and paste the routing prompt (Ctrl+V).`);
                 vscode.window.showWarningMessage(
                     `junai autopilot: could not auto-open @${targetAgent}. Routing prompt copied to clipboard.`,
                     'View Log'
@@ -512,28 +526,11 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
                 return;
             }
 
-            channel.appendLine(`  ✓ Opened @${targetAgent}`);
-
-            // Step 2 — wait for chat panel to settle, then send routing prompt
-            await delay(700);
-
-            const sendOk = await tryExecuteCommand(channel, 'workbench.action.chat.steerWithMessage', prompt);
-
-            if (sendOk) {
-                channel.appendLine(`  ✓ Routing prompt sent`);
-                vscode.window.showInformationMessage(
-                    `junai autopilot: ✅ @${targetAgent} invoked — stage: ${stage}`,
-                    'View Log'
-                ).then(c => { if (c === 'View Log') { channel.show(true); } });
-            } else {
-                // steerWithMessage unavailable — copy prompt, ask user to paste
-                await vscode.env.clipboard.writeText(prompt);
-                channel.appendLine(`  ⚠ steerWithMessage not available — prompt copied to clipboard`);
-                vscode.window.showInformationMessage(
-                    `junai autopilot: @${targetAgent} opened. Paste routing prompt to send (Ctrl+V).`,
-                    'View Log'
-                ).then(c => { if (c === 'View Log') { channel.show(true); } });
-            }
+            channel.appendLine(`  ✓ Opened @${targetAgent} — routing prompt sent as query (also in clipboard)`);
+            vscode.window.showInformationMessage(
+                `junai autopilot: ✅ @${targetAgent} invoked — stage: ${stage}`,
+                'View Log'
+            ).then(c => { if (c === 'View Log') { channel.show(true); } });
 
         } catch {
             // malformed JSON mid-write — ignore, next save will retry
