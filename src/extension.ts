@@ -18,19 +18,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Start autopilot watcher — fires when pipeline-state.json routing_decision appears in autopilot
     startAutopilotWatcher(context);
 
-    // Register junai-mcp as an MCP server definition provider (VS Code 1.102+)
-    // Uses dynamic check so the extension still works on older VS Code versions.
-    const lm = vscode.lm as any;
-    if (typeof lm.registerMcpServerDefinitionProvider === 'function') {
-        const McpStdio = (vscode as any).McpStdioServerDefinition;
-        context.subscriptions.push(
-            lm.registerMcpServerDefinitionProvider('junai', {
-                provideMcpServerDefinitions: (_token: any) => [
-                    new McpStdio('junai MCP Server', 'uvx', ['junai-mcp'])
-                ]
-            })
-        );
-    }
+    // MCP server is registered via .vscode/mcp.json (written by junai.init → scaffoldMcpConfig).
+    // No dynamic registerMcpServerDefinitionProvider needed — the mcp.json key "junai" must match
+    // the tool prefix in agent frontmatter (e.g. junai/notify_orchestrator).
 
     // Welcome prompt — show once per workspace when the agent pool is not yet installed
     promptWelcomeIfNeeded(context);
@@ -265,8 +255,12 @@ async function cmdRemove() {
             const cfg = JSON.parse(fs.readFileSync(mcpFile, 'utf8'));
             if (cfg.servers && cfg.servers['junai']) {
                 delete cfg.servers['junai'];
-                fs.writeFileSync(mcpFile, JSON.stringify(cfg, null, 2), 'utf8');
             }
+            // Also clean up legacy key name
+            if (cfg.servers && cfg.servers['junai-pipeline']) {
+                delete cfg.servers['junai-pipeline'];
+            }
+            fs.writeFileSync(mcpFile, JSON.stringify(cfg, null, 2), 'utf8');
         } catch { /* leave mcp.json untouched if unreadable */ }
     }
 
@@ -394,6 +388,11 @@ function scaffoldMcpConfig(targetFolder: string): void {
         try { config = JSON.parse(fs.readFileSync(mcpFile, 'utf8')); } catch { config = {}; }
     }
     if (!config.servers) { config.servers = {}; }
+
+    // Migrate: remove legacy "junai-pipeline" key if present (renamed to "junai" in v0.3)
+    if (config.servers['junai-pipeline']) {
+        delete config.servers['junai-pipeline'];
+    }
 
     // Only write if no junai entry already exists — never overwrite a user's custom config
     if (!config.servers['junai']) {
