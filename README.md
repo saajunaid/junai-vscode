@@ -21,9 +21,9 @@
 
 <div align="center">
 
-![junai AI Agent Pipeline — 22 agents, 3 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
+![junai AI Agent Pipeline — 24 agents, 3 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
 
-*22 agents · 3 model tiers · full handoff map*
+*24 agents · 3 model tiers · full handoff map*
 
 </div>
 
@@ -44,7 +44,7 @@ Idea → Intent → PRD → Architecture → Plan → Implement → Test → Rev
 |---|---|---|---|
 | Persistent state across sessions | ✅ | ❌ | ❌ |
 | Deterministic routing state machine | ✅ | ❌ | ❌ |
-| 23 role-scoped specialist agents | ✅ | ❌ | 4–6 generic agents |
+| 24 role-scoped specialist agents | ✅ | ❌ | 4–6 generic agents |
 | Full SDLC: Intent → PRD → Arch → Plan → Impl → Test → Review | ✅ | ❌ | Partial |
 | Three pipeline modes: supervised / assisted / autopilot | ✅ | ❌ | ❌ |
 | Autopilot watcher — auto-opens next agent, zero clicks | ✅ | ❌ | ❌ |
@@ -80,7 +80,7 @@ In **autopilot** mode, the junai extension watches your `pipeline-state.json` in
 
 ---
 
-## 🧠 23 Specialist Agents
+## 🧠 24 Specialist Agents
 
 Each agent is a deeply crafted instruction file in `.github/agents/` — scoped to a single responsibility, model-matched for its task, and wired with handoff buttons to the next stage.
 
@@ -88,7 +88,7 @@ Each agent is a deeply crafted instruction file in `.github/agents/` — scoped 
 |---|---|---|
 | 🔵 **Deep Reasoning** | Architect, PRD, Plan, SQL Expert, Security Analyst, Data Engineer, Debug, UX Designer, UI/UX Designer | Claude Opus 4.6 |
 | ⚡ **Multi-file Coding** | Implement, Frontend Developer, Streamlit Developer, DevOps, Tester | Claude Sonnet 4.6 |
-| 🎯 **Orchestration** | Orchestrator, Code Reviewer, Mentor, Janitor, Prompt Engineer, Mermaid Specialist, SVG Diagram, Accessibility | Claude Sonnet 4.6 |
+| 🎯 **Orchestration** | Orchestrator, Code Reviewer, Anchor, Mentor, Janitor, Prompt Engineer, Mermaid Specialist, SVG Diagram, Accessibility | Claude Sonnet 4.6 |
 
 All agents share a **handoff protocol** — each completion writes artefact paths and routing context into `pipeline-state.json`, so the Orchestrator can cold-start a new session from state alone.
 
@@ -105,8 +105,8 @@ The junai MCP server provides callable pipeline operations from Copilot chat:
 | `notify_orchestrator` | Record stage completion + trigger routing decision |
 | `set_pipeline_mode` | Switch supervised / assisted / autopilot |
 | `satisfy_gate` | Manually satisfy a supervision gate |
-| `get_pipeline_status` | Read current stage, mode, routing decision, and `progress_line` |
-| `skip_stage` | Skip the current stage (when allowed) with explicit reason and auto gate carry-forward |
+| `skip_stage` | Skip the current stage with auto-gate satisfaction — unskippable on `implement`, `anchor`, `tester` |
+| `get_pipeline_status` | Read current stage, mode, routing decision, and formatted `progress_line` |
 | `validate_deferred_paths` | Verify deferred item file paths before close |
 | `run_command` | Execute CLI commands from chat context |
 
