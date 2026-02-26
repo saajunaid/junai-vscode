@@ -94,7 +94,7 @@ All agents share a **handoff protocol** — each completion writes artefact path
 
 ---
 
-## 🔧 8 MCP Tools
+## 🔧 9 MCP Tools
 
 The junai MCP server provides callable pipeline operations from Copilot chat:
 
@@ -105,7 +105,8 @@ The junai MCP server provides callable pipeline operations from Copilot chat:
 | `notify_orchestrator` | Record stage completion + trigger routing decision |
 | `set_pipeline_mode` | Switch supervised / assisted / autopilot |
 | `satisfy_gate` | Manually satisfy a supervision gate |
-| `get_pipeline_status` | Read current stage, mode, routing decision |
+| `get_pipeline_status` | Read current stage, mode, routing decision, and `progress_line` |
+| `skip_stage` | Skip the current stage (when allowed) with explicit reason and auto gate carry-forward |
 | `validate_deferred_paths` | Verify deferred item file paths before close |
 | `run_command` | Execute CLI commands from chat context |
 

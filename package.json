@@ -1,8 +1,8 @@
 {
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
-  "description": "Agentic Engineering for GitHub Copilot. Structured multi-agent SDLC pipeline — 23 specialist agents, deterministic routing, 3 pipeline modes (supervised/assisted/autopilot), persistent state, and autopilot watcher. From idea to shipped.",
-  "version": "0.4.1",
+  "description": "Agentic Engineering for GitHub Copilot — 23 specialist agents, deterministic SDLC routing, skip-stage control, progress-line status, and autopilot watcher.",
+  "version": "0.4.2",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.101.0"
