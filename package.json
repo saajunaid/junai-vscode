@@ -114,8 +114,8 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "bundle-pool": "node scripts/bundle-pool.js",
-    "package": "vsce package --no-dependencies",
-    "publish": "vsce publish --no-dependencies",
+    "package": "npx vsce package --no-dependencies",
+    "publish": "npx vsce publish --no-dependencies",
     "pretest": "npm run compile"
   },
   "devDependencies": {
