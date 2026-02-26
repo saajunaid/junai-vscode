@@ -15,3 +15,7 @@ icon2.png
 icon.gif
 node_modules/**
 media/**
+
+# Local secret files — must NEVER be bundled into VSIX
+*.pat
+*.key
