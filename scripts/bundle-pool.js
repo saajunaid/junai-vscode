@@ -35,6 +35,10 @@ const POOL_FILES = [
 ];
 const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.DS_Store', '.venv']);
 
+// Skill sub-folders excluded from the marketplace bundle.
+// These are internal/proprietary skills not intended for public distribution.
+const SKIP_SKILLS = new Set(['vmie']);
+
 // ── Paths ─────────────────────────────────────────────────────────────────────
 const ROOT    = path.resolve(__dirname, '..');
 const poolDir = path.join(ROOT, 'pool');
@@ -55,7 +59,7 @@ function resolveSource() {
     return null;
 }
 
-function copyDirSync(src, dest) {
+function copyDirSync(src, dest, extraSkip = null) {
     if (!fs.existsSync(src)) {
         console.warn(`  ⚠  Not found, skipping: ${path.relative(ROOT, src)}`);
         return 0;
@@ -64,10 +68,11 @@ function copyDirSync(src, dest) {
     let count = 0;
     for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
         if (SKIP.has(entry.name)) { continue; }
+        if (extraSkip && extraSkip.has(entry.name)) { continue; }
         const srcPath  = path.join(src, entry.name);
         const destPath = path.join(dest, entry.name);
         if (entry.isDirectory()) {
-            count += copyDirSync(srcPath, destPath);
+            count += copyDirSync(srcPath, destPath, extraSkip);
         } else {
             fs.copyFileSync(srcPath, destPath);
             count++;
@@ -96,7 +101,8 @@ fs.mkdirSync(poolDir, { recursive: true });
 let total = 0;
 
 for (const dir of POOL_DIRS) {
-    const count = copyDirSync(path.join(source, dir), path.join(poolDir, dir));
+    const extraSkip = dir === 'skills' ? SKIP_SKILLS : null;
+    const count = copyDirSync(path.join(source, dir), path.join(poolDir, dir), extraSkip);
     if (count > 0) {
         console.log(`  ✓  ${dir.padEnd(20)} ${count} files`);
     }
