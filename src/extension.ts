@@ -663,24 +663,9 @@ function checkPoolUpdate(context: vscode.ExtensionContext): void {
     if (!bundled) { return; }                    // old bundle without version marker — skip
     if (bundled === workspace) { return; }        // already up to date
 
-    // workspace === null means the project was initialized before version stamping existed.
-    // Auto-update silently — no toast required, no user action needed.
-    // This covers the reinstall/update case where the stamp was never written.
-    if (workspace === null) {
-        vscode.commands.executeCommand('junai.update', { silent: true });
-        return;
-    }
-
-    // Workspace has a version stamp but is behind — nudge the user
-    vscode.window.showInformationMessage(
-        `junai agent pool update available: v${workspace} → v${bundled}`,
-        'Update Now',
-        'Later',
-    ).then(choice => {
-        if (choice === 'Update Now') {
-            vscode.commands.executeCommand('junai.update');
-        }
-    });
+    // Pool files are bundled with the extension — always auto-update silently.
+    // No user action required for either a fresh stamp (null) or an older stamp.
+    vscode.commands.executeCommand('junai.update', { silent: true });
 }
 
 function scaffoldPipelineState(githubDir: string, mode: string): void {
