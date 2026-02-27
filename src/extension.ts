@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.status',          () => cmdStatus()),
         vscode.commands.registerCommand('junai.setMode',         () => cmdSetMode()),
         vscode.commands.registerCommand('junai.remove',          () => cmdRemove()),
-        vscode.commands.registerCommand('junai.update',          () => cmdUpdate(context)),
+        vscode.commands.registerCommand('junai.update',          (opts?: { silent?: boolean }) => cmdUpdate(context, opts)),
         vscode.commands.registerCommand('junai.probeAutopilot',  () => cmdProbeAutopilot()),
     );
 
@@ -271,28 +271,31 @@ async function cmdRemove() {
 // ─────────────────────────────────────────────────────────────
 // junai.update — overwrite pool files with latest from extension bundle
 // ─────────────────────────────────────────────────────────────────────────────
-async function cmdUpdate(context: vscode.ExtensionContext) {
+async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boolean }) {
+    const silent = opts?.silent ?? false;
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage('junai: No workspace folder open.');
+        if (!silent) { vscode.window.showErrorMessage('junai: No workspace folder open.'); }
         return;
     }
 
     const githubDir = path.join(workspaceFolders[0].uri.fsPath, '.github');
     const agentsDir = path.join(githubDir, 'agents');
     if (!fs.existsSync(agentsDir)) {
-        vscode.window.showErrorMessage('junai: Pipeline not initialized in this project. Run Initialize first.');
+        if (!silent) { vscode.window.showErrorMessage('junai: Pipeline not initialized in this project. Run Initialize first.'); }
         return;
     }
 
-    const confirmed = await vscode.window.showInformationMessage(
-        'Update agent pool with latest files from this extension version? ' +
-        'Your pipeline-state.json and project-config.md will NOT be touched.',
-        { modal: true },
-        'Update',
-        'Cancel',
-    );
-    if (confirmed !== 'Update') { return; }
+    if (!silent) {
+        const confirmed = await vscode.window.showInformationMessage(
+            'Update agent pool with latest files from this extension version? ' +
+            'Your pipeline-state.json and project-config.md will NOT be touched.',
+            { modal: true },
+            'Update',
+            'Cancel',
+        );
+        if (confirmed !== 'Update') { return; }
+    }
 
     const poolDir = path.join(context.extensionPath, 'pool');
 
@@ -339,7 +342,9 @@ async function cmdUpdate(context: vscode.ExtensionContext) {
     );
 
     vscode.window.showInformationMessage(
-        `✅ junai pool updated — ${updated} files refreshed, ${skipped} user-owned files preserved.`
+        silent
+            ? `junai: Agent pool auto-updated to v${readBundledPoolVersion(context) ?? 'latest'} — ${updated} files refreshed.`
+            : `✅ junai pool updated — ${updated} files refreshed, ${skipped} user-owned files preserved.`
     );
 }
 // ─────────────────────────────────────────────────────────────
@@ -658,17 +663,24 @@ function checkPoolUpdate(context: vscode.ExtensionContext): void {
     if (!bundled) { return; }                    // old bundle without version marker — skip
     if (bundled === workspace) { return; }        // already up to date
 
-    // Workspace is behind — nudge the user
-    const label = workspace
-        ? `junai agent pool update available: v${workspace} → v${bundled}`
-        : `junai agent pool update available (v${bundled})`;
+    // workspace === null means the project was initialized before version stamping existed.
+    // Auto-update silently — no toast required, no user action needed.
+    // This covers the reinstall/update case where the stamp was never written.
+    if (workspace === null) {
+        vscode.commands.executeCommand('junai.update', { silent: true });
+        return;
+    }
 
-    vscode.window.showInformationMessage(label, 'Update Now', 'Later')
-        .then(choice => {
-            if (choice === 'Update Now') {
-                vscode.commands.executeCommand('junai.update');
-            }
-        });
+    // Workspace has a version stamp but is behind — nudge the user
+    vscode.window.showInformationMessage(
+        `junai agent pool update available: v${workspace} → v${bundled}`,
+        'Update Now',
+        'Later',
+    ).then(choice => {
+        if (choice === 'Update Now') {
+            vscode.commands.executeCommand('junai.update');
+        }
+    });
 }
 
 function scaffoldPipelineState(githubDir: string, mode: string): void {
