@@ -65,10 +65,19 @@ function copyDirSync(src, dest, extraSkip = null) {
         return 0;
     }
     fs.mkdirSync(dest, { recursive: true });
+    // The immediate parent folder name — used to skip accidentally-nested duplicates
+    // e.g. skills/skills/, prompts/prompts/ created by errant sync operations.
+    const parentName = path.basename(dest);
     let count = 0;
     for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
         if (SKIP.has(entry.name)) { continue; }
         if (extraSkip && extraSkip.has(entry.name)) { continue; }
+        // Guard: skip any subfolder whose name matches its immediate parent
+        // (e.g. skills/skills, prompts/prompts — these are always accidental nesting)
+        if (entry.isDirectory() && entry.name === parentName) {
+            console.warn(`  ⚠  Skipping accidental nesting: ${path.relative(ROOT, src)}/${entry.name}/`);
+            continue;
+        }
         const srcPath  = path.join(src, entry.name);
         const destPath = path.join(dest, entry.name);
         if (entry.isDirectory()) {

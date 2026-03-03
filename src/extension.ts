@@ -310,7 +310,17 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
         async (progress) => {
             progress.report({ message: 'Updating agent pool…' });
 
+            // Heal any accidental nesting (e.g. skills/skills, prompts/prompts) that may have
+            // been deployed by earlier extension versions.  Safe to remove — these are exact
+            // duplicates of the parent folder content and are never user-created.
             const poolDirs = ['agents', 'skills', 'prompts', 'instructions', 'agent-docs', 'plans', 'handoffs', 'tools'];
+            for (const dir of poolDirs) {
+                const nested = path.join(githubDir, dir, dir);
+                if (fs.existsSync(nested)) {
+                    fs.rmSync(nested, { recursive: true, force: true });
+                }
+            }
+
             for (const dir of poolDirs) {
                 const src  = path.join(poolDir, dir);
                 const dest = path.join(githubDir, dir);
@@ -371,8 +381,12 @@ function mergeDirSync(src: string, dest: string, userOwned: Set<string>): { upda
     let updated = 0; let skipped = 0;
     if (!fs.existsSync(src)) { return { updated, skipped }; }
     fs.mkdirSync(dest, { recursive: true });
+    // Guard: skip any subfolder whose name matches its immediate parent
+    // (e.g. skills/skills, prompts/prompts — accidental nesting from errant syncs)
+    const parentName = path.basename(dest);
     for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
         if (SKIP.has(entry.name)) { continue; }
+        if (entry.isDirectory() && entry.name === parentName) { continue; }
         const srcPath  = path.join(src, entry.name);
         const destPath = path.join(dest, entry.name);
         if (entry.isDirectory()) {
