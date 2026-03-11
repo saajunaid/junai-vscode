@@ -4,6 +4,22 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.5.7] — 2026-03-11
+
+### New Features
+
+- **`copilot-instructions.md` is now user-owned** — The `.github/copilot-instructions.md` file deployed to your project is no longer overwritten by pool updates (`Update Agent Pool`). It is now protected alongside `pipeline-state.json` and `project-config.md`. Once you add project-specific context to it (architecture notes, team conventions, institutional knowledge), that context is preserved across every extension update. The update confirmation dialog and notification messages both reflect this change.
+
+- **`junai-system.instructions.md` — pool-managed junai documentation** — A new file (`.github/instructions/junai-system.instructions.md`, `applyTo: "**"`) is bundled in the pool and refreshed on every `Update Agent Pool`. It contains all junai system documentation: the 25 agents (model assignments, key roles), pipeline flow (stages, modes, routing mechanism), VS Code Autopilot integration, the 9 MCP tools, and key pipeline conventions. VS Code Copilot loads it automatically in every chat session, so your Copilot always has up-to-date information about the pipeline even when `copilot-instructions.md` contains only your project-specific notes.
+
+- **`copilot-instructions.md` becomes a project-context template** — The `copilot-instructions.md` deployed to new installs is now a short, structured template with clearly labelled sections (Project Overview, Tech Stack, Architecture Notes, Team Conventions, Institutional Knowledge) backed by plain HTML comments so you know exactly what to fill in. Existing installs that already have the file are unaffected (USER_OWNED — not overwritten).
+
+### Bug Fixes
+
+- Fixed: `Update Agent Pool` silently overwrote `.github/copilot-instructions.md` on every pool update, destroying any project-specific context the user had documented there. Now it is skipped like `pipeline-state.json` and `project-config.md`.
+
+---
+
 ## [0.5.6] — 2026-03-11
 
 ### New Features

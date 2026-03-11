@@ -482,7 +482,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     if (!silent) {
         const confirmed = await vscode.window.showInformationMessage(
             'Update agent pool with latest files from this extension version? ' +
-            'Your pipeline-state.json and project-config.md will NOT be touched.',
+            'Your pipeline-state.json, project-config.md, and copilot-instructions.md will NOT be touched.',
             { modal: true },
             'Update',
             'Cancel',
@@ -493,7 +493,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     const poolDir = path.join(context.extensionPath, 'pool');
 
     // Files that belong to the user — never overwrite
-    const USER_OWNED = new Set(['pipeline-state.json', 'project-config.md']);
+    const USER_OWNED = new Set(['pipeline-state.json', 'project-config.md', 'copilot-instructions.md']);
 
     let updated = 0;
     let skipped = 0;
