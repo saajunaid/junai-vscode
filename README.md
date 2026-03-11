@@ -21,9 +21,9 @@
 
 <div align="center">
 
-![junai AI Agent Pipeline — 24 agents, 3 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
+![junai AI Agent Pipeline — 25 agents, 3 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
 
-*24 agents · 3 model tiers · full handoff map*
+*25 agents · 3 model tiers · full handoff map*
 
 </div>
 
@@ -33,7 +33,7 @@
 
 Most AI coding tools are **chat assistants**. You ask, they answer. There is no memory, no process, no structure — and when your session ends, context dies with it.
 
-**junai is different.** It brings **Agentic Engineering** to your codebase: a structured software delivery lifecycle orchestrated by 23 role-scoped AI agents, driven by a deterministic state machine, and tracked in a plain-text `pipeline-state.json` that survives every session restart.
+**junai is different.** It brings **Agentic Engineering** to your codebase: a structured software delivery lifecycle orchestrated by 25 role-scoped AI agents, driven by a deterministic state machine, and tracked in a plain-text `pipeline-state.json` that survives every session restart.
 
 ```
 Idea → Intent → PRD → Architecture → Plan → Implement → Test → Review → Shipped
@@ -44,7 +44,7 @@ Idea → Intent → PRD → Architecture → Plan → Implement → Test → Rev
 |---|---|---|---|
 | Persistent state across sessions | ✅ | ❌ | ❌ |
 | Deterministic routing state machine | ✅ | ❌ | ❌ |
-| 24 role-scoped specialist agents | ✅ | ❌ | 4–6 generic agents |
+| 25 role-scoped specialist agents | ✅ | ❌ | 4–6 generic agents |
 | Full SDLC: Intent → PRD → Arch → Plan → Impl → Test → Review | ✅ | ❌ | Partial |
 | Three pipeline modes: supervised / assisted / autopilot | ✅ | ❌ | ❌ |
 | Autopilot watcher — auto-opens next agent, zero clicks | ✅ | ❌ | ❌ |
@@ -80,7 +80,7 @@ In **autopilot** mode, the junai extension watches your `pipeline-state.json` in
 
 ---
 
-## 🧠 24 Specialist Agents
+## 🧠 25 Specialist Agents
 
 Each agent is a deeply crafted instruction file in `.github/agents/` — scoped to a single responsibility, model-matched for its task, and wired with handoff buttons to the next stage.
 
@@ -135,7 +135,7 @@ One command. Everything below lands in your `.github/` folder and travels with y
 
 | Folder | Contents |
 |---|---|
-| `agents/` | 23 role-scoped agent files — deeply crafted system prompts per specialist |
+| `agents/` | 25 role-scoped agent files — deeply crafted system prompts per specialist |
 | `skills/` | Reusable skill modules agents can load on demand |
 | `prompts/` | Workflow-level prompt templates (ADR, conventional commit, handoff, etc.) |
 | `instructions/` | VS Code `.instructions.md` files for Copilot context (Python, FastAPI, SQL, Docker...) |
@@ -179,7 +179,7 @@ Plus at the root level:
 
 ## 📚 Learn More
 
-- [Full User Guide](https://github.com/saajunaid/junai/blob/main/USERGUIDE.md) — walkthrough, CLI reference, all 23 agents, stage table, troubleshooting
+- [Full User Guide](https://github.com/saajunaid/junai/blob/main/USERGUIDE.md) — walkthrough, CLI reference, all 25 agents, stage table, troubleshooting
 - [GitHub](https://github.com/saajunaid/junai) — star the repo, read the source
 - [Issues & Feature Requests](https://github.com/saajunaid/junai-vscode/issues)
 

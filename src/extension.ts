@@ -8,6 +8,7 @@ import * as path from 'path';
 export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('junai.init',            () => cmdInit(context)),
+        vscode.commands.registerCommand('junai.selectProfile',   (opts?: { targetFolder?: string; silent?: boolean }) => cmdSelectProfile(context, opts)),
         vscode.commands.registerCommand('junai.status',          () => cmdStatus()),
         vscode.commands.registerCommand('junai.setMode',         () => cmdSetMode()),
         vscode.commands.registerCommand('junai.remove',          () => cmdRemove()),
@@ -36,7 +37,16 @@ function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
     const agentsDir = path.join(workspaceFolders[0].uri.fsPath, '.github', 'agents');
     if (fs.existsSync(agentsDir)) { return; }   // already initialised — stay silent
 
-    // Only prompt once per workspace (suppress if user dismissed before)
+    // Check the user's preferred auto-init behaviour
+    const autoMode = vscode.workspace.getConfiguration('junai').get<string>('autoInitializeOnActivation', 'prompt');
+    if (autoMode === 'never') { return; }   // user opted out entirely
+    if (autoMode === 'always') {
+        // Silently initialize without any dialog — cmdInit({ silent: true }) guards against re-init
+        void cmdInit(context, { silent: true });
+        return;
+    }
+
+    // 'prompt' mode — default: show info message once per workspace
     const storageKey = `junai.welcomed.${workspaceFolders[0].uri.fsPath}`;
     if (context.workspaceState.get<boolean>(storageKey)) { return; }
 
@@ -59,16 +69,19 @@ export function deactivate() {}
 // ─────────────────────────────────────────────────────────────
 // junai.init — copy agent pool into workspace .github/
 // ─────────────────────────────────────────────────────────────
-async function cmdInit(context: vscode.ExtensionContext) {
+async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boolean }) {
+    const silent = opts?.silent ?? false;
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
-        vscode.window.showErrorMessage('junai: No workspace folder open. Open a project folder first.');
+        if (!silent) {
+            vscode.window.showErrorMessage('junai: No workspace folder open. Open a project folder first.');
+        }
         return;
     }
 
-    // Multi-root: let user pick folder
+    // Multi-root: let user pick folder (silent mode always uses first folder)
     let targetFolder: string;
-    if (workspaceFolders.length === 1) {
+    if (workspaceFolders.length === 1 || silent) {
         targetFolder = workspaceFolders[0].uri.fsPath;
     } else {
         const picked = await vscode.window.showQuickPick(
@@ -89,12 +102,15 @@ async function cmdInit(context: vscode.ExtensionContext) {
 
     // Already initialised?
     if (fs.existsSync(agentsDir)) {
+        if (silent) { return; }  // auto-init never re-initializes an existing project
         const choice = await vscode.window.showWarningMessage(
-            'junai pipeline is already initialised in this project.',
+            'junai pipeline is already initialised in this project. Your project-config.md will be backed up before overwriting.',
             { modal: true },
             'Overwrite', 'Cancel'
         );
         if (choice !== 'Overwrite') { return; }
+        // Backup project-config.md so the user can recover their customisations
+        backupProjectConfig(githubDir);
     }
 
     // Read the configured default mode
@@ -125,6 +141,15 @@ async function cmdInit(context: vscode.ExtensionContext) {
         }
     );
 
+    await promptProfileSelectionAfterInit(context, targetFolder);
+
+    if (silent) {
+        vscode.window.showInformationMessage(
+            `✅ junai agent pipeline auto-initialized (mode: ${mode}).`
+        );
+        return;
+    }
+
     const open = await vscode.window.showInformationMessage(
         `✅ junai agent pipeline installed (mode: ${mode}). MCP server configured in .vscode/mcp.json. Open ARTIFACTS.md to get started.`,
         'Open ARTIFACTS.md', 'Dismiss'
@@ -138,6 +163,174 @@ async function cmdInit(context: vscode.ExtensionContext) {
             );
         }
     }
+}
+
+// Friendly one-line descriptions shown in the profile picker alongside the profile name.
+// Keys match the ### profilename headings in project-config.md.
+const PROFILE_DESCRIPTIONS: Record<string, string> = {
+    'streamlit-mssql-enterprise':        'Streamlit dashboard + SQL Server — enterprise internal tools',
+    'streamlit-postgres-analytics':      'Streamlit dashboard + PostgreSQL — analytics and BI apps',
+    'fastapi-postgres-service':          'FastAPI REST service + PostgreSQL — cloud microservices',
+    'fastapi-mssql-internal-api':        'FastAPI REST service + SQL Server — internal corporate APIs',
+    'react-node-saas':                   'React + Node.js — SaaS products and customer-facing apps',
+    'nextjs-postgres-saas':              'Next.js + PostgreSQL — full-stack SaaS with SSR',
+    'data-pipeline-python-mssql':        'Python ETL pipeline + SQL Server — data engineering',
+    'data-pipeline-python-snowflake':    'Python data pipeline + Snowflake — cloud data warehouse',
+    'ml-training-python-pytorch':        'PyTorch ML training — GPU workloads and model development',
+    'mcp-server-python':                 'Python MCP server — Model Context Protocol tooling',
+    'vscode-extension-typescript':       'VS Code extension — TypeScript, vsce, activation events',
+    'telecom-appointment-intelligence':  'FastAPI + React + MSSQL + Redis + Ollama — full-stack AI system',
+    'org1-telecom-ops':                  'Org1 — telecoms operations, full brand colour palette included',
+    'org2-finance-ops':                  'Org2 — finance operations team profile',
+    'org3-healthcare-ops':               'Org3 — healthcare operations team profile',
+};
+
+async function cmdSelectProfile(
+    context: vscode.ExtensionContext,
+    opts?: { targetFolder?: string; silent?: boolean }
+): Promise<void> {
+    const silent = opts?.silent ?? false;
+    const targetFolder = opts?.targetFolder ?? await pickTargetFolder();
+    if (!targetFolder) { return; }
+
+    const projectConfigPath = path.join(targetFolder, '.github', 'project-config.md');
+    if (!fs.existsSync(projectConfigPath)) {
+        const initialize = await vscode.window.showInformationMessage(
+            'junai: project-config.md not found. Initialize pipeline resources first?',
+            'Initialize Now', 'Cancel'
+        );
+        if (initialize !== 'Initialize Now') { return; }
+        await vscode.commands.executeCommand('junai.init');
+        if (!fs.existsSync(projectConfigPath)) { return; }
+    }
+
+    const raw = fs.readFileSync(projectConfigPath, 'utf8');
+    const profiles = extractProfileNames(raw);
+    if (profiles.length === 0) {
+        if (!silent) {
+            vscode.window.showWarningMessage(
+                'junai: No named profiles found in .github/project-config.md. Add profile definitions first.'
+            );
+        }
+        return;
+    }
+
+    const options: vscode.QuickPickItem[] = profiles.map((name) => ({
+        label: name,
+        description: PROFILE_DESCRIPTIONS[name] ?? `Set active profile to ${name}`,
+    }));
+    options.push({
+        label: 'manual (blank profile)',
+        description: 'Clear profile — fill placeholder values manually in Step 2',
+    });
+
+    const picked = await vscode.window.showQuickPick(options, {
+        placeHolder: 'Select a project profile for .github/project-config.md',
+    });
+    if (!picked) { return; }
+
+    const selectedProfile = picked.label === 'manual (blank profile)' ? '' : picked.label;
+    const updated = setProfileValue(raw, selectedProfile);
+    if (updated === raw) {
+        if (!silent) {
+            vscode.window.showWarningMessage('junai: Could not locate the profile row in project-config.md.');
+        }
+        return;
+    }
+
+    fs.writeFileSync(projectConfigPath, updated, 'utf8');
+    if (!silent) {
+        const finalLabel = selectedProfile || '(blank/manual)';
+        vscode.window.showInformationMessage(`junai: project profile set to ${finalLabel}.`);
+    }
+
+    const storageKey = `junai.profilePrompted.${targetFolder}`;
+    await context.workspaceState.update(storageKey, true);
+}
+
+async function promptProfileSelectionAfterInit(
+    context: vscode.ExtensionContext,
+    targetFolder: string
+): Promise<void> {
+    const storageKey = `junai.profilePrompted.${targetFolder}`;
+    if (context.workspaceState.get<boolean>(storageKey)) { return; }
+
+    const projectConfigPath = path.join(targetFolder, '.github', 'project-config.md');
+    if (!fs.existsSync(projectConfigPath)) { return; }
+
+    const raw = fs.readFileSync(projectConfigPath, 'utf8');
+    const profiles = extractProfileNames(raw);
+    if (profiles.length === 0) { return; }
+    if (currentProfileValue(raw).length > 0) {
+        await context.workspaceState.update(storageKey, true);
+        return;
+    }
+
+    const choice = await vscode.window.showInformationMessage(
+        'junai: Select a predefined profile now? This pre-fills project context for all agents.',
+        'Select Profile',
+        'Later'
+    );
+    if (choice === 'Select Profile') {
+        await cmdSelectProfile(context, { targetFolder });
+    } else {
+        await context.workspaceState.update(storageKey, true);
+    }
+}
+
+async function pickTargetFolder(): Promise<string | null> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('junai: No workspace folder open. Open a project folder first.');
+        return null;
+    }
+
+    if (workspaceFolders.length === 1) {
+        return workspaceFolders[0].uri.fsPath;
+    }
+
+    const picked = await vscode.window.showQuickPick(
+        workspaceFolders.map((f) => ({
+            label: f.name,
+            description: f.uri.fsPath,
+            fsPath: f.uri.fsPath,
+        })),
+        { placeHolder: 'Select workspace folder' }
+    );
+    if (!picked) { return null; }
+    return picked.fsPath;
+}
+
+function extractProfileNames(markdown: string): string[] {
+    const sanitized = markdown.replace(/<!--[\s\S]*?-->/g, '');
+    const matches = sanitized.matchAll(/^###\s+([a-z0-9][a-z0-9-]*)\s*$/gim);
+    const names = Array.from(matches, (m) => m[1].trim());
+    return [...new Set(names)];
+}
+
+function currentProfileValue(markdown: string): string {
+    const row = markdown.match(/^\|\s*\*\*profile\*\*\s*\|\s*(.*?)\s*\|\s*$/im);
+    if (!row || row.length < 2) { return ''; }
+    return row[1].replace(/`/g, '').trim();
+}
+
+function setProfileValue(markdown: string, profile: string): string {
+    const formatted = profile ? `\`${profile}\`` : '``';
+    return markdown.replace(
+        /^\|\s*\*\*profile\*\*\s*\|\s*.*?\s*\|\s*$/im,
+        `| **profile** | ${formatted} |`
+    );
+}
+
+// Backup project-config.md to project-config.bak.<timestamp>.md before an interactive overwrite.
+// Returns true if a backup was written, false if the source did not exist.
+function backupProjectConfig(githubDir: string): boolean {
+    const src = path.join(githubDir, 'project-config.md');
+    if (!fs.existsSync(src)) { return false; }
+    const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const dest = path.join(githubDir, `project-config.bak.${ts}.md`);
+    fs.copyFileSync(src, dest);
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -420,19 +613,15 @@ function scaffoldMcpConfig(targetFolder: string): void {
 
     // Only write if no junai entry already exists — never overwrite a user's custom config
     if (!config.servers['junai']) {
-        // Use the local server.py that ships with the pool (deployed to .github/tools/mcp-server/).
-        // This avoids the uvx-based PyPI approach (junai-mcp v0.1.x), which ran pipeline_runner
-        // via subprocess using the uvx-isolated Python — that env lacks pydantic and all
-        // workspace deps, so the subprocess always failed silently.
-        // The local server.py uses direct in-process imports, so no subprocess or dep issues.
+        // Use `uv run` with the PEP 723 inline script header in server.py.
+        // uv reads the `# dependencies = ["fastmcp"]` comment and auto-creates an isolated
+        // environment on first run — no manual pip install or per-project venv needed.
+        // Users only need `uv` installed once globally (https://docs.astral.sh/uv/).
         // ${workspaceFolder} is resolved by VS Code at MCP startup time.
-        const pythonBin = process.platform === 'win32'
-            ? '${workspaceFolder}/.venv/Scripts/python.exe'
-            : '${workspaceFolder}/.venv/bin/python';
         config.servers['junai'] = {
             type: 'stdio',
-            command: pythonBin,
-            args: ['${workspaceFolder}/.github/tools/mcp-server/server.py'],
+            command: 'uv',
+            args: ['run', '${workspaceFolder}/.github/tools/mcp-server/server.py'],
         };
         fs.writeFileSync(mcpFile, JSON.stringify(config, null, 2), 'utf8');
     }
