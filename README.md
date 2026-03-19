@@ -145,11 +145,28 @@ One command. Everything below lands in your `.github/` folder and travels with y
 
 Plus at the root level:
 - `pipeline-state.json` — live pipeline state (stage, mode, gates, routing decisions, artefact refs)
+- `copilot-instructions.md` — **your project context file** (junai manages only a small `<!-- junai:start -->` … `<!-- junai:end -->` section; everything else is yours and is never touched)
+- `copilot-instructions.md` — **your project context file** (junai manages only a small `<!-- junai:start -->` … `<!-- junai:end -->` section; everything else is yours and is never touched)
 - `.vscode/mcp.json` — MCP server registered automatically (requires `uv`)
 
 ---
 
-## 🛠️ Commands
+## � Your Files Are Safe
+
+junai never overwrites your project-specific content. Here's how it works:
+
+| File | On Initialize | On Update | On Remove |
+|---|---|---|---|
+| `copilot-instructions.md` | Creates file with a small junai section (or appends it if your file already exists) | Refreshes only the `<!-- junai:start -->` … `<!-- junai:end -->` block — your content outside the markers is untouched | Strips only the junai section — your content stays |
+| `pipeline-state.json` | Creates if missing | Never touched | Deleted |
+| `project-config.md` | Creates (with backup if overwriting) | Never touched | Deleted |
+| Agent/skill/instruction files | Installed | Updated to latest | Deleted |
+
+**The pattern:** junai uses sentinel-delimited managed sections — the same approach used by SSH config, Terraform, and other professional tools. Your `copilot-instructions.md` is yours. junai's section is ~10 lines pointing to the real docs in `.github/instructions/`.
+
+---
+
+## �🛠️ Commands
 
 | Command | What it does |
 |---|---|

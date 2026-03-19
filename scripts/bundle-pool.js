@@ -30,7 +30,6 @@ const POOL_DIRS = [
     'tools',
 ];
 const POOL_FILES = [
-    'copilot-instructions.md',
     'project-config.md',
 ];
 const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.DS_Store', '.venv']);

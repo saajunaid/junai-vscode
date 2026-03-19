@@ -4,6 +4,24 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.6.2] — 2026-06-28
+
+### New Features
+
+- **Managed-section `copilot-instructions.md`** — The extension no longer owns the entire `copilot-instructions.md` file. Instead, it manages a small sentinel-delimited block (`<!-- junai:start -->` … `<!-- junai:end -->`) containing a ~10-line signpost to the real documentation in `.github/instructions/junai-system.instructions.md`. Everything outside the markers is yours and is never read, modified, or deleted by the extension.
+
+  - **Initialize**: Creates the file with a template + managed section if it doesn't exist; appends the managed section if your file already exists without sentinels.
+  - **Update**: Refreshes only the managed section — your project-specific content is untouched.
+  - **Remove**: Strips only the managed section and cleans up blank lines — your content stays.
+
+- **`copilot-instructions.md` removed from pool bundle** — The file is no longer copied into `pool/` by `bundle-pool.js` and is no longer deployed via `copyDirSync`. The extension synthesizes the managed section programmatically, ensuring the content always matches the installed extension version.
+
+### Migration
+
+- Users upgrading from 0.6.1 or earlier: on the next **Update Agent Pool**, the extension detects the old full-file format (no sentinels), appends the managed section at the end of your existing file, and preserves all your content. No manual steps required.
+
+---
+
 ## [0.5.7] — 2026-03-11
 
 ### New Features

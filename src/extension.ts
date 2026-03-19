@@ -3,6 +3,93 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // ─────────────────────────────────────────────────────────────
+// Managed section in copilot-instructions.md
+// ─────────────────────────────────────────────────────────────
+const JUNAI_SECTION_START = '<!-- junai:start — managed by junai extension, do not edit this section -->';
+const JUNAI_SECTION_END   = '<!-- junai:end -->';
+
+function junaiManagedSection(): string {
+    return [
+        JUNAI_SECTION_START,
+        '',
+        '## junai Agent Pipeline',
+        '',
+        '> junai system documentation (agents, pipeline flow, MCP tools, routing conventions) is',
+        '> automatically provided by `.github/instructions/junai-system.instructions.md`.',
+        '>',
+        '> Project-specific config: `.github/project-config.md` | Pipeline state: `.github/pipeline-state.json`',
+        '>',
+        '> Start with `@Orchestrator` in Copilot Chat.',
+        '',
+        JUNAI_SECTION_END,
+    ].join('\n');
+}
+
+/**
+ * Ensure copilot-instructions.md exists and contains the junai managed section.
+ * - If the file doesn't exist, creates it with a template header + managed section.
+ * - If the file exists but has no managed section, appends the section.
+ * - If the file exists and already has a managed section, replaces it with the latest.
+ * Never touches content outside the managed section delimiters.
+ */
+function ensureCopilotInstructionsSection(githubDir: string): void {
+    const filePath = path.join(githubDir, 'copilot-instructions.md');
+    const section  = junaiManagedSection();
+
+    if (!fs.existsSync(filePath)) {
+        // First-time creation: clean template + managed section
+        const template = [
+            '# Project Instructions',
+            '',
+            '<!-- Add your project\'s context, conventions, and institutional knowledge below. -->',
+            '',
+            '---',
+            '',
+            section,
+            '',
+        ].join('\n');
+        fs.writeFileSync(filePath, template, 'utf8');
+        return;
+    }
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    const startIdx = content.indexOf(JUNAI_SECTION_START);
+    const endIdx   = content.indexOf(JUNAI_SECTION_END);
+
+    if (startIdx !== -1 && endIdx !== -1) {
+        // Replace existing managed section
+        const before = content.slice(0, startIdx);
+        const after  = content.slice(endIdx + JUNAI_SECTION_END.length);
+        fs.writeFileSync(filePath, before + section + after, 'utf8');
+    } else {
+        // Append managed section to end of existing file
+        const separator = content.endsWith('\n') ? '\n' : '\n\n';
+        fs.writeFileSync(filePath, content + separator + section + '\n', 'utf8');
+    }
+}
+
+/**
+ * Remove only the junai managed section from copilot-instructions.md.
+ * Leaves the rest of the file intact. Does nothing if no managed section found.
+ */
+function removeCopilotInstructionsSection(githubDir: string): void {
+    const filePath = path.join(githubDir, 'copilot-instructions.md');
+    if (!fs.existsSync(filePath)) { return; }
+
+    const content  = fs.readFileSync(filePath, 'utf8');
+    const startIdx = content.indexOf(JUNAI_SECTION_START);
+    const endIdx   = content.indexOf(JUNAI_SECTION_END);
+
+    if (startIdx === -1 || endIdx === -1) { return; }
+
+    const before = content.slice(0, startIdx);
+    const after  = content.slice(endIdx + JUNAI_SECTION_END.length);
+    // Clean up double blank lines left by removal
+    const cleaned = (before + after).replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+    fs.writeFileSync(filePath, cleaned, 'utf8');
+}
+
+// ─────────────────────────────────────────────────────────────
 // Activate
 // ─────────────────────────────────────────────────────────────
 export function activate(context: vscode.ExtensionContext) {
@@ -126,6 +213,9 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
         async (progress) => {
             progress.report({ message: 'Copying agent pool…' });
             copyDirSync(poolDir, githubDir);
+
+            progress.report({ message: 'Setting up copilot-instructions.md…' });
+            ensureCopilotInstructionsSection(githubDir);
 
             progress.report({ message: 'Scaffolding pipeline state…' });
             scaffoldPipelineState(githubDir, mode);
@@ -436,11 +526,12 @@ async function cmdRemove() {
         if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); }
     }
 
-    // Root files installed by init
-    for (const file of ['pipeline-state.json', 'copilot-instructions.md', 'project-config.md', '.junai-pool-version']) {
+    // Root files installed by init (except copilot-instructions.md — only strip managed section)
+    for (const file of ['pipeline-state.json', 'project-config.md', '.junai-pool-version']) {
         const p = path.join(githubDir, file);
         if (fs.existsSync(p)) { fs.rmSync(p, { force: true }); }
     }
+    removeCopilotInstructionsSection(githubDir);
 
     // Remove junai entry from .vscode/mcp.json without deleting the whole file
     const mcpFile = path.join(targetFolder, '.vscode', 'mcp.json');
@@ -482,7 +573,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     if (!silent) {
         const confirmed = await vscode.window.showInformationMessage(
             'Update agent pool with latest files from this extension version? ' +
-            'Your pipeline-state.json, project-config.md, and copilot-instructions.md will NOT be touched.',
+            'Your copilot-instructions.md content is preserved (only the junai section is refreshed).',
             { modal: true },
             'Update',
             'Cancel',
@@ -492,8 +583,8 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
 
     const poolDir = path.join(context.extensionPath, 'pool');
 
-    // Files that belong to the user — never overwrite
-    const USER_OWNED = new Set(['pipeline-state.json', 'project-config.md', 'copilot-instructions.md']);
+    // Files that belong to the user — never overwrite during directory merge
+    const USER_OWNED = new Set(['pipeline-state.json', 'project-config.md']);
 
     let updated = 0;
     let skipped = 0;
@@ -523,15 +614,8 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
                 skipped += counts.skipped;
             }
 
-            // Update root pool files (not user-owned ones)
-            for (const file of ['copilot-instructions.md']) {
-                const src  = path.join(poolDir, file);
-                const dest = path.join(githubDir, file);
-                if (fs.existsSync(src) && !USER_OWNED.has(file)) {
-                    fs.copyFileSync(src, dest);
-                    updated++;
-                }
-            }
+            // Refresh only the managed section in copilot-instructions.md
+            ensureCopilotInstructionsSection(githubDir);
 
             // Write pool version marker so activation check knows workspace is current
             writeWorkspacePoolVersion(context, githubDir);
