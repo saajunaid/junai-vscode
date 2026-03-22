@@ -1,8 +1,8 @@
 {
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
-  "description": "Agentic Engineering for GitHub Copilot. 25 specialist agents, 9 MCP tools, deterministic routing, 3 pipeline modes (supervised/assisted/autopilot), autopilot watcher, and safe managed-section copilot-instructions.md — your content is never overwritten. From idea to shipped.",
-  "version": "0.6.2",
+  "description": "Agentic Engineering for GitHub Copilot. 25 specialist agents, 9 MCP tools, deterministic routing, 3 pipeline modes (supervised/assisted/autopilot), autopilot watcher, and safe managed-section copilot-instructions.md â€” your content is never overwritten. From idea to shipped.",
+  "version": "0.6.3",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.101.0"
@@ -46,7 +46,7 @@
     {
       "url": "https://img.shields.io/badge/status-beta-orange?style=flat-square",
       "href": "https://github.com/saajunaid/junai-vscode",
-      "description": "Beta — early access, APIs subject to change"
+      "description": "Beta â€” early access, APIs subject to change"
     }
   ],
   "repository": {
@@ -119,7 +119,7 @@
             "never"
           ],
           "enumDescriptions": [
-            "Show a notification offering to initialize — default behaviour",
+            "Show a notification offering to initialize â€” default behaviour",
             "Silently initialize the agent pipeline the first time a workspace is opened (no prompts, first-time only)",
             "Never auto-initialize or show the welcome prompt on activation"
           ],
@@ -145,6 +145,7 @@
     "typescript": "^5.3.0"
   }
 }
+
 
 
 
