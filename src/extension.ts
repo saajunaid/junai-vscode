@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawnSync } from 'child_process';
 
 // ─────────────────────────────────────────────────────────────
 // Managed section in copilot-instructions.md
@@ -588,6 +589,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
 
     let updated = 0;
     let skipped = 0;
+    const git: { result: GitCommitResult } = { result: 'skipped-no-repo' };
 
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'junai', cancellable: false },
@@ -624,15 +626,24 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
             scaffoldMcpConfig(workspaceFolders[0].uri.fsPath);
             scaffoldVscodeSettings(workspaceFolders[0].uri.fsPath);
 
+            // Auto-commit pool files so they never appear as uncommitted noise in the user's working tree
+            progress.report({ message: 'Committing pool update…' });
+            git.result = gitCommitPoolUpdate(workspaceFolders[0].uri.fsPath, readBundledPoolVersion(context) ?? undefined);
+
             progress.report({ message: 'Done.' });
         }
     );
 
-    vscode.window.showInformationMessage(
-        silent
-            ? `junai: Agent pool auto-updated to v${readBundledPoolVersion(context) ?? 'latest'} — ${updated} files refreshed.`
-            : `✅ junai pool updated — ${updated} files refreshed, ${skipped} user-owned files preserved.`
-    );
+    const poolVer = readBundledPoolVersion(context) ?? 'latest';
+    let msg = silent
+        ? `junai: Agent pool auto-updated to v${poolVer} — ${updated} files refreshed.`
+        : `✅ junai pool updated — ${updated} files refreshed, ${skipped} user-owned files preserved.`;
+    if (git.result === 'committed')               { msg += ' Pool changes committed to git.'; }
+    else if (git.result === 'skipped-in-progress') { msg += ' (git commit skipped — repo has an in-progress operation; commit manually)'; }
+    else if (git.result === 'skipped-detached')    { msg += ' (git commit skipped — detached HEAD)'; }
+    else if (git.result === 'error')               { msg += ' (git commit failed — commit manually if needed)'; }
+    // 'nothing-to-commit' and 'skipped-no-repo' are silent (no message suffix)
+    vscode.window.showInformationMessage(msg);
 }
 // ─────────────────────────────────────────────────────────────
 const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.DS_Store']);
@@ -953,6 +964,72 @@ function checkPoolUpdate(context: vscode.ExtensionContext): void {
     // Pool files are bundled with the extension — always auto-update silently.
     // No user action required for either a fresh stamp (null) or an older stamp.
     vscode.commands.executeCommand('junai.update', { silent: true });
+}
+
+// ─────────────────────────────────────────────────────────────
+// Auto-commit pool update to git after cmdUpdate writes pool files.
+// Returns a status so the caller can surface appropriate messaging.
+// Edge cases handled:
+//   • git not installed / not a git repo  → 'skipped-no-repo'
+//   • in-progress operation (rebase/merge/cherry-pick/bisect) → 'skipped-in-progress'
+//   • detached HEAD                        → 'skipped-detached'
+//   • no actual changes staged             → 'nothing-to-commit'
+//   • missing author identity              → retry with embedded identity
+//   • workspace nested inside git root     → uses `git rev-parse --show-toplevel`
+//   • Windows path separators             → args array (no shell, no injection risk)
+// ─────────────────────────────────────────────────────────────
+type GitCommitResult = 'committed' | 'nothing-to-commit' | 'skipped-no-repo' | 'skipped-in-progress' | 'skipped-detached' | 'error';
+
+function gitCommitPoolUpdate(workspaceRoot: string, poolVersion: string | undefined): GitCommitResult {
+    const label = poolVersion ? `v${poolVersion}` : 'latest';
+
+    function run(args: string[], cwd: string, extraEnv?: Record<string, string>): { ok: boolean; out: string } {
+        const env = extraEnv ? { ...process.env, ...extraEnv } : undefined;
+        const r = spawnSync('git', args, { cwd, encoding: 'utf8', env });
+        return { ok: r.status === 0 && !r.error, out: ((r.stdout as string) ?? '').trim() };
+    }
+
+    // 1. Verify git is available and the workspace is inside a git repo
+    if (!run(['rev-parse', '--git-dir'], workspaceRoot).ok) { return 'skipped-no-repo'; }
+
+    // 2. Locate .git dir and check for in-progress operations
+    const gitDirResult = run(['rev-parse', '--git-dir'], workspaceRoot);
+    const gitDir = path.isAbsolute(gitDirResult.out)
+        ? gitDirResult.out
+        : path.join(workspaceRoot, gitDirResult.out);
+
+    const inProgressMarkers = ['rebase-merge', 'rebase-apply', 'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'BISECT_LOG'];
+    if (inProgressMarkers.some(m => fs.existsSync(path.join(gitDir, m)))) {
+        return 'skipped-in-progress';
+    }
+
+    // 3. Guard: detached HEAD (commit would create an unreachable commit)
+    if (!run(['symbolic-ref', 'HEAD'], workspaceRoot).ok) { return 'skipped-detached'; }
+
+    // 4. Use git root (workspace folder may be nested inside the repo)
+    const rootResult = run(['rev-parse', '--show-toplevel'], workspaceRoot);
+    if (!rootResult.ok) { return 'skipped-no-repo'; }
+    const gitRoot = rootResult.out;
+
+    // 5. Stage pool dirs using paths relative to git root
+    //    Uses args array (not shell string) — safe from injection and Windows path issues
+    const githubDir = path.join(workspaceRoot, '.github');
+    const relGithub = path.relative(gitRoot, githubDir).split(path.sep).join('/');
+    const poolDirs = ['agents', 'tools', 'skills', 'instructions', 'prompts', 'diagrams', 'handoffs', 'agent-docs'];
+    const stagePaths = poolDirs.map(d => `${relGithub}/${d}`);
+    run(['add', '--', ...stagePaths], gitRoot);
+
+    // 6. Check whether anything was actually staged (exit 0 = no changes)
+    if (run(['diff', '--cached', '--quiet'], gitRoot).ok) { return 'nothing-to-commit'; }
+
+    // 7. Commit — try repo identity first, fall back to embedded author if unconfigured
+    const commitMsg = `chore(junai): update pool to ${label}`;
+    const commitArgs = ['commit', '-m', commitMsg];
+    if (run(commitArgs, gitRoot).ok) { return 'committed'; }
+
+    // Retry: user has no global git author configured (common on fresh machines)
+    const fallbackEnv = { GIT_AUTHOR_NAME: 'junai', GIT_AUTHOR_EMAIL: 'junai-bot@localhost', GIT_COMMITTER_NAME: 'junai', GIT_COMMITTER_EMAIL: 'junai-bot@localhost' };
+    return run(commitArgs, gitRoot, fallbackEnv).ok ? 'committed' : 'error';
 }
 
 function scaffoldPipelineState(githubDir: string, mode: string): void {
