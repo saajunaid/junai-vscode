@@ -4,6 +4,42 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.6.6] — 2026-03-22
+
+### New Features
+
+- **Auto-commit pool files after `Update Agent Pool`** — After writing pool files to the workspace, the extension now automatically stages and commits all pool directories (`.github/agents`, `tools`, `skills`, `instructions`, `prompts`, `diagrams`, `handoffs`, `agent-docs`) to git. Users no longer see uncommitted pool files as noise in their working tree after an update.
+  - All edge cases handled: no git repo or git not installed (silently skipped); in-progress operation (rebase / merge / cherry-pick / bisect) — skipped with notification; detached HEAD — skipped with notification; no staged changes — skipped (no empty commit created); missing author identity — retries with fallback `junai-bot@localhost` identity; workspace nested inside a larger git root — uses `git rev-parse --show-toplevel` to find true root; Windows paths — uses `spawnSync` args array (no shell, no injection risk).
+  - Commit message: `chore(junai): update pool to v{version}`.
+  - Result appended to the update notification only when actionable (committed, in-progress, detached HEAD, or error); silently does nothing if no repo or nothing changed.
+
+---
+
+## [0.6.5] — 2026-03-22
+
+### Bug Fixes
+
+- **Pool update scan runs in all pipeline modes** — The activation-time stale-pool check now fires regardless of `pipeline_mode` value. Previously it only triggered in `supervised` mode, so workspaces running `assisted` or `autopilot` never received silent auto-update prompts.
+- **Backward-compatible `mode` key migration** — `pipeline-state.json` files written by older extension versions used `"mode"` instead of `"pipeline_mode"`. The extension now reads both keys during the activation scan so silent auto-updates resume correctly on legacy workspaces without requiring a manual init.
+
+---
+
+## [0.6.4] — 2026-03-22
+
+### Bug Fixes
+
+- **Plan agent output enforces YAML frontmatter** — The `Plan` agent's output contract now requires a YAML frontmatter block at the top of every plan file. Fixes plans that could previously be written without the required metadata header.
+
+---
+
+## [0.6.3] — 2026-03-22
+
+### Internal
+
+- Fixed Unicode encoding in `package.json` display strings (em dashes now use proper `—` characters throughout).
+
+---
+
 ## [0.6.2] — 2026-06-28
 
 ### New Features
