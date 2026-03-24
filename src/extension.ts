@@ -596,10 +596,15 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
         async (progress) => {
             progress.report({ message: 'Updating agent pool…' });
 
-            // Heal any accidental nesting (e.g. skills/skills, prompts/prompts) that may have
-            // been deployed by earlier extension versions.  Safe to remove — these are exact
-            // duplicates of the parent folder content and are never user-created.
+            // Pool directories split into two deployment modes:
+            // - "clean" dirs are fully managed by the pool — wipe before copy so
+            //   renamed/moved/deleted files don't persist as stale orphans.
+            // - "merge" dirs may contain user-generated content (plans, artefacts)
+            //   — additive copy only, never delete user files.
+            const cleanDirs = new Set(['agents', 'skills', 'prompts', 'instructions', 'tools']);
             const poolDirs = ['agents', 'skills', 'prompts', 'instructions', 'agent-docs', 'plans', 'handoffs', 'tools'];
+
+            // Heal any accidental nesting (e.g. skills/skills) from earlier versions
             for (const dir of poolDirs) {
                 const nested = path.join(githubDir, dir, dir);
                 if (fs.existsSync(nested)) {
@@ -611,6 +616,10 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
                 const src  = path.join(poolDir, dir);
                 const dest = path.join(githubDir, dir);
                 if (!fs.existsSync(src)) { continue; }
+                // Clean deploy: wipe destination first for fully-managed dirs
+                if (cleanDirs.has(dir) && fs.existsSync(dest)) {
+                    fs.rmSync(dest, { recursive: true, force: true });
+                }
                 const counts = mergeDirSync(src, dest, USER_OWNED);
                 updated += counts.updated;
                 skipped += counts.skipped;
