@@ -4,6 +4,25 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.7.0] — 2026-03-26
+
+### New Features
+
+- **9 new frontend skills** — Added word-cloud, ui-ux-intelligence (CSV knowledge bases), slides, banner-design, brand-design, design-system-tokens, brand-voice, and ui-styling-patterns to the frontend skill category. Moved algorithmic-art from media to frontend.
+- **Skill pool expanded to 121** — Up from 112. Frontend category now has 27 skills (was 18).
+- **Agent skill references updated** — ui-ux-designer, ux-designer, and frontend-developer agents now reference the new skills with mandatory triggers.
+- **README rewritten** — Clearer structure, accurate model assignments, updated pool counts, removed duplicates.
+
+---
+
+## [0.6.8] — 2026-03-24
+
+### Improvements
+
+- **Pool update reliability** — Minor stability improvements to the pool update flow.
+
+---
+
 ## [0.6.6] — 2026-03-22
 
 ### New Features

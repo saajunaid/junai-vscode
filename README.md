@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 <img src="https://raw.githubusercontent.com/saajunaid/junai-vscode/main/icon.png" alt="junai" width="96"/>
 
@@ -6,7 +6,7 @@
 
 ### Agentic Engineering for GitHub Copilot
 
-**The only structured, persistent, auditable multi-agent SDLC pipeline — purpose-built for GitHub Copilot.**
+**A structured, persistent, auditable multi-agent SDLC pipeline — purpose-built for GitHub Copilot.**
 
 [![Beta](https://img.shields.io/badge/status-beta-orange?style=flat-square)](https://github.com/saajunaid/junai-vscode)
 [![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/junai-labs.junai?color=0066cc&label=marketplace&style=flat-square&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=junai-labs.junai)
@@ -21,183 +21,208 @@
 
 <div align="center">
 
-![junai AI Agent Pipeline — 25 agents, 3 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
+![junai AI Agent Pipeline — 25 agents, 4 model tiers, full handoff map](https://raw.githubusercontent.com/saajunaid/junai-vscode/main/media/pipeline-poster.png)
 
-*25 agents · 3 model tiers · full handoff map*
+*25 agents · 4 model tiers · 121 skills · full handoff map*
 
 </div>
 
 ---
 
-## Why junai?
+## What is junai?
 
-Most AI coding tools are **chat assistants**. You ask, they answer. There is no memory, no process, no structure — and when your session ends, context dies with it.
+Most AI coding tools are chat assistants — you ask, they answer, and when the session ends, all context is lost.
 
-**junai is different.** It brings **Agentic Engineering** to your codebase: a structured software delivery lifecycle orchestrated by 25 role-scoped AI agents, driven by a deterministic state machine, and tracked in a plain-text `pipeline-state.json` that survives every session restart.
+**junai turns GitHub Copilot into a full software delivery pipeline.** 25 specialist AI agents — each scoped to a single role like Architect, Implementer, Tester, or Code Reviewer — collaborate through a deterministic state machine that persists across sessions. Every stage transition is logged in a plain-text `pipeline-state.json` that lives in your repo.
 
 ```
-Idea → Intent → PRD → Architecture → Plan → Implement → Test → Review → Shipped
-         ↑ every stage has a specialist agent, every transition is logged, every gate is explicit
+Idea → PRD → Architecture → Plan → Implement → Test → Review → Done
+  ↑ every stage has a dedicated agent, every transition is tracked, every gate is explicit
 ```
 
-| | junai | Generic AI Chat | Other Agent Tools |
+### How junai compares
+
+| Feature | junai | Generic AI Chat | Other Agent Tools |
 |---|---|---|---|
-| Persistent state across sessions | ✅ | ❌ | ❌ |
-| Deterministic routing state machine | ✅ | ❌ | ❌ |
-| 25 role-scoped specialist agents | ✅ | ❌ | 4–6 generic agents |
-| Full SDLC: Intent → PRD → Arch → Plan → Impl → Test → Review | ✅ | ❌ | Partial |
-| Three pipeline modes: supervised / assisted / autopilot | ✅ | ❌ | ❌ |
-| Autopilot watcher — auto-opens next agent, zero clicks | ✅ | ❌ | ❌ |
-| Works with GitHub Copilot you already pay for | ✅ | ❌ | No — requires new API keys |
-| Repo-portable — travels with your `.github/` folder | ✅ | ❌ | ❌ |
-| Auditable — all state in git-committed plain text | ✅ | ❌ | ❌ |
-| MCP tools — pipeline ops callable from Copilot chat | ✅ | ❌ | Varies |
+| State persists across sessions | Yes | No | No |
+| Deterministic routing (state machine) | Yes | No | No |
+| 25 role-scoped specialist agents | Yes | No | 4–6 generic |
+| Full SDLC pipeline | Yes | No | Partial |
+| Three modes: supervised / assisted / autopilot | Yes | No | No |
+| Autopilot watcher (auto-opens next agent) | Yes | No | No |
+| Works with your existing Copilot subscription | Yes | No | Needs separate API keys |
+| Portable — lives in `.github/`, travels with your repo | Yes | No | No |
+| Auditable — all state in git-committed JSON | Yes | No | No |
+| 9 MCP tools callable from chat | Yes | No | Varies |
 
 ---
 
-## 🚀 Three Pipeline Modes
+## Quick Start
 
-| Mode | How it works | Best for |
-|---|---|---|
-| 🎛️ **supervised** | Every gate requires your explicit approval before advancing | Learning the pipeline, high-stakes changes |
-| 🤝 **assisted** | AI generates guidance and gate recommendations — you approve | Most day-to-day feature work |
-| 🤖 **autopilot** | All gates auto-satisfied after intent sign-off. The extension watches `pipeline-state.json` and **automatically opens the next agent and sends its routing prompt** — no clicks needed | Trusted, well-scoped work |
+Three steps to get going:
 
-Switch mode anytime from Copilot chat:
-> *"Switch pipeline to autopilot mode"*
-
----
-
-## 🤖 Autopilot Watcher
-
-In **autopilot** mode, the junai extension watches your `pipeline-state.json` in real-time. The moment a stage completes and the routing decision is written, the extension:
-
-1. Reads `_routing_decision.target_agent` from the state file
-2. Automatically opens the correct specialist agent in Copilot chat
-3. Sends the handoff prompt — the agent starts working immediately
-
-**You sign off the intent once. The pipeline does the rest.**
-
----
-
-## 🧠 25 Specialist Agents
-
-Each agent is a deeply crafted instruction file in `.github/agents/` — scoped to a single responsibility, model-matched for its task, and wired with handoff buttons to the next stage.
-
-| Tier | Agents | Model |
-|---|---|---|
-| 🔵 **Deep Reasoning** | Architect, PRD, Plan, SQL Expert, Security Analyst, Data Engineer, Debug, UX Designer, UI/UX Designer | Claude Opus 4.6 |
-| ⚡ **Multi-file Coding** | Implement, Frontend Developer, Streamlit Developer, DevOps, Tester | Claude Sonnet 4.6 |
-| 🎯 **Orchestration** | Orchestrator, Code Reviewer, Anchor, Mentor, Janitor, Prompt Engineer, Mermaid Specialist, SVG Diagram, Accessibility | Claude Sonnet 4.6 |
-
-All agents share a **handoff protocol** — each completion writes artefact paths and routing context into `pipeline-state.json`, so the Orchestrator can cold-start a new session from state alone.
-
----
-
-## 🔧 9 MCP Tools
-
-The junai MCP server provides callable pipeline operations from Copilot chat:
-
-| Tool | What it does |
-|---|---|
-| `pipeline_init` | Initialise a new pipeline (active-pipeline guard built-in) |
-| `pipeline_reset` | Force-clear and restart (bypasses guard) |
-| `notify_orchestrator` | Record stage completion + trigger routing decision |
-| `set_pipeline_mode` | Switch supervised / assisted / autopilot |
-| `satisfy_gate` | Manually satisfy a supervision gate |
-| `skip_stage` | Skip the current stage with auto-gate satisfaction — unskippable on `implement`, `anchor`, `tester` |
-| `get_pipeline_status` | Read current stage, mode, routing decision, and formatted `progress_line` |
-| `validate_deferred_paths` | Verify deferred item file paths before close |
-| `run_command` | Execute CLI commands from chat context |
-
----
-
-## ⚡ Quick Start
-
-1. Open any project in VS Code
-2. Press `Ctrl+Shift+P` → **`junai: Initialize Agent Pipeline`**
-3. The full agent pool installs into `.github/` and the MCP server is configured
-
-Then in Copilot chat, open `@Orchestrator` and say:
+1. **Install** — Search `junai` in the VS Code Extensions panel, or install from the [Marketplace](https://marketplace.visualstudio.com/items?itemName=junai-labs.junai)
+2. **Initialize** — Press `Ctrl+Shift+P` → **`junai: Initialize Agent Pipeline`**. The full agent pool installs into `.github/` and the MCP server is auto-configured
+3. **Start building** — Open Copilot Chat, select **Orchestrator** from the agent picker, and say:
 
 ```
 New feature: <describe what you want to build>
 I want to run this in autopilot mode.
 ```
 
-The pipeline takes it from there.
+The pipeline handles routing from there.
+
+### Prerequisites
+
+| Requirement | Why |
+|---|---|
+| **VS Code** 1.101+ | Agent mode support |
+| **GitHub Copilot** subscription | Agents run as Copilot chat participants |
+| **`uv`** on PATH | Runs the MCP server — [install uv](https://docs.astral.sh/uv/getting-started/installation/) (one command, ~30 seconds) |
 
 ---
 
-## 📁 What Gets Installed
+## Three Pipeline Modes
 
-One command. Everything below lands in your `.github/` folder and travels with your repo.
+| Mode | How it works | Best for |
+|---|---|---|
+| **Supervised** | Every gate requires your explicit click before advancing | Learning the pipeline, high-stakes changes |
+| **Assisted** | Agents route automatically — you only approve key gates | Day-to-day feature work |
+| **Autopilot** | All gates auto-satisfied after intent sign-off; the extension watches `pipeline-state.json` and **opens the next agent automatically** — zero clicks | Trusted, well-scoped work |
 
-| Folder | Contents |
+Switch anytime from Copilot chat:
+> *"Switch pipeline to autopilot mode"*
+
+### How autopilot works
+
+In **autopilot** mode, junai watches `pipeline-state.json` in real-time. When a stage completes:
+
+1. Reads the routing decision from the state file
+2. Opens the correct specialist agent in Copilot chat automatically
+3. Sends the handoff prompt — the agent starts working immediately
+
+**You approve the intent once. The pipeline does the rest.**
+
+---
+
+## 25 Specialist Agents
+
+Each agent is a deeply crafted instruction file in `.github/agents/` — scoped to a single responsibility, model-matched for the task, and wired with handoffs to the next stage.
+
+### Model assignments
+
+| Model | Agents |
 |---|---|
-| `agents/` | 25 role-scoped agent files — deeply crafted system prompts per specialist |
-| `skills/` | Reusable skill modules agents can load on demand |
-| `prompts/` | Workflow-level prompt templates (ADR, conventional commit, handoff, etc.) |
-| `instructions/` | VS Code `.instructions.md` files for Copilot context (Python, FastAPI, SQL, Docker...) |
+| **Claude Opus 4.6** | Anchor, Architect |
+| **Claude Sonnet 4.6** | Orchestrator, Planner, PRD, Code Reviewer, Debug, Security Analyst, Prompt Engineer, Mentor, Knowledge Transfer, Project Manager, UX Designer, UI/UX Designer, Accessibility |
+| **GPT-5.3-Codex** | Implement, Frontend Developer, Streamlit Developer, Data Engineer, DevOps, SQL Expert, Tester, Janitor |
+| **Gemini 3.1 Pro** | Mermaid Diagram Specialist, SVG Diagram |
+
+All agents share a **handoff protocol** — each completion writes artefact paths and routing context into `pipeline-state.json`, so the Orchestrator can cold-start a new session from state alone.
+
+---
+
+## 121 Reusable Skills
+
+Skills are modular knowledge packs that agents load on demand — covering everything from testing strategies to design systems. Organized across **10 categories**:
+
+| Category | Skills | Examples |
+|---|---|---|
+| **Coding** | 20 | API design, refactoring, code patterns |
+| **Frontend** | 27 | CSS architecture, design systems, word clouds, brand design, UI styling |
+| **Workflow** | 16 | Git, CI/CD, deployment workflows |
+| **Productivity** | 11 | Documentation, planning, automation |
+| **Media** | 10 | SVG, image processing, visualization |
+| **Docs** | 9 | Technical writing, README generation |
+| **Cloud** | 6 | AWS, Azure, infrastructure |
+| **Data** | 6 | ETL, data pipelines, analytics |
+| **DevOps** | 6 | Docker, monitoring, infrastructure |
+| **Testing** | 6 | Unit, integration, E2E testing |
+
+Agents automatically load the right skills based on the task at hand. You can also reference skills directly in chat.
+
+---
+
+## 9 MCP Tools
+
+The MCP server provides pipeline operations callable directly from Copilot chat:
+
+| Tool | What it does |
+|---|---|
+| `pipeline_init` | Start a new pipeline (active-pipeline guard built-in) |
+| `pipeline_reset` | Force-clear and restart (bypasses guard) |
+| `notify_orchestrator` | Record stage completion + trigger routing |
+| `set_pipeline_mode` | Switch supervised / assisted / autopilot |
+| `satisfy_gate` | Manually satisfy a supervision gate |
+| `skip_stage` | Skip the current stage (blocked on implement, anchor, tester) |
+| `get_pipeline_status` | Read current stage, mode, and routing decision |
+| `validate_deferred_paths` | Verify deferred artefact file paths exist |
+| `run_command` | Execute CLI commands from chat context |
+
+---
+
+## What Gets Installed
+
+One command. Everything lands in your `.github/` folder and travels with your repo.
+
+| Folder | What's inside |
+|---|---|
+| `agents/` | 25 agent definition files — one per specialist |
+| `skills/` | 121 reusable skill modules across 10 categories |
+| `prompts/` | 30 workflow-level prompt templates (ADR, commit, handoff, etc.) |
+| `instructions/` | 24 coding convention files for Copilot context (Python, SQL, FastAPI, Docker, security, etc.) |
 | `plans/` | Plan templates and backlog scaffold |
-| `agent-docs/` | ARTIFACTS hub, architecture, PRD, UX, security docs |
-| `handoffs/` | Cross-session context handoff protocol |
+| `agent-docs/` | Artefact hub, architecture docs, schema references |
+| `handoffs/` | Cross-session handoff protocol |
+| `tools/` | MCP server (auto-registered via `uv run`, no pip install needed) |
 
 Plus at the root level:
-- `pipeline-state.json` — live pipeline state (stage, mode, gates, routing decisions, artefact refs)
-- `copilot-instructions.md` — **your project context file** (junai manages only a small `<!-- junai:start -->` … `<!-- junai:end -->` section; everything else is yours and is never touched)
-- `copilot-instructions.md` — **your project context file** (junai manages only a small `<!-- junai:start -->` … `<!-- junai:end -->` section; everything else is yours and is never touched)
-- `.vscode/mcp.json` — MCP server registered automatically (requires `uv`)
+
+| File | Purpose |
+|---|---|
+| `pipeline-state.json` | Live pipeline state — stage, mode, gates, routing, artefacts |
+| `copilot-instructions.md` | **Your project context file** — junai manages a small `<!-- junai:start -->` … `<!-- junai:end -->` section; everything else is yours and never touched |
+| `.vscode/mcp.json` | MCP server registration (auto-configured) |
 
 ---
 
-## � Your Files Are Safe
+## Your Files Are Safe
 
-junai never overwrites your project-specific content. Here's how it works:
+junai uses **sentinel-delimited managed sections** — the same approach used by SSH config and Terraform. Your content is never overwritten.
 
 | File | On Initialize | On Update | On Remove |
 |---|---|---|---|
-| `copilot-instructions.md` | Creates file with a small junai section (or appends it if your file already exists) | Refreshes only the `<!-- junai:start -->` … `<!-- junai:end -->` block — your content outside the markers is untouched | Strips only the junai section — your content stays |
-| `pipeline-state.json` | Creates if missing | Never touched | Deleted |
-| `project-config.md` | Creates (with backup if overwriting) | Never touched | Deleted |
-| Agent/skill/instruction files | Installed | Updated to latest | Deleted |
-
-**The pattern:** junai uses sentinel-delimited managed sections — the same approach used by SSH config, Terraform, and other professional tools. Your `copilot-instructions.md` is yours. junai's section is ~10 lines pointing to the real docs in `.github/instructions/`.
+| `copilot-instructions.md` | Created with a small junai section (or appended if yours already exists) | Only the `<!-- junai:start -->` … `<!-- junai:end -->` block is refreshed — your content is untouched | Only the junai section is stripped — your content stays |
+| `pipeline-state.json` | Created if missing | Never touched | Deleted |
+| `project-config.md` | Created (backup if overwriting) | Never touched | Deleted |
+| Agent / skill / instruction files | Installed | Updated to latest | Deleted |
 
 ---
 
-## �🛠️ Commands
+## Commands
 
 | Command | What it does |
 |---|---|
 | `junai: Initialize Agent Pipeline` | Install the full agent pool and configure the MCP server |
-| `junai: Update Agent Pool` | Pull latest agent/skill files from the extension — preserves your pipeline state |
-| `junai: Show Pipeline Status` | Inline status: current stage, mode, gate states, last routing decision |
-| `junai: Set Pipeline Mode` | Switch pipeline mode without re-initialising |
+| `junai: Update Agent Pool` | Pull latest agent/skill files — preserves your pipeline state |
+| `junai: Show Pipeline Status` | View current stage, mode, gate states, and last routing decision |
+| `junai: Set Pipeline Mode` | Switch pipeline mode without re-initializing |
 | `junai: Remove from this project` | Clean uninstall — removes agent pool and MCP config |
 
 ---
 
-## ⚙️ Extension Settings
+## Extension Settings
 
 | Setting | Default | Description |
 |---|---|---|
-| `junai.defaultMode` | `supervised` | Pipeline mode applied on `Initialize` |
+| `junai.defaultMode` | `supervised` | Pipeline mode applied on Initialize |
 
 ---
 
-## 📋 Requirements
-
-- **VS Code** 1.101+
-- **GitHub Copilot** subscription (the agents are Copilot chat participants)
-- **`uv`** on PATH for MCP server — [install uv](https://docs.astral.sh/uv/getting-started/installation/) (one command, 30 seconds)
-
----
-
-## 📚 Learn More
+## Learn More
 
 - [Full User Guide](https://github.com/saajunaid/junai/blob/main/USERGUIDE.md) — walkthrough, CLI reference, all 25 agents, stage table, troubleshooting
-- [GitHub](https://github.com/saajunaid/junai) — star the repo, read the source
+- [GitHub](https://github.com/saajunaid/junai) — star the repo, browse the source
 - [Issues & Feature Requests](https://github.com/saajunaid/junai-vscode/issues)
 
 ---
@@ -207,6 +232,6 @@ junai never overwrites your project-specific content. Here's how it works:
 *The future of software engineering is agentic.*
 *junai makes it structured, auditable, and yours.*
 
-**MIT © junai Labs**
+**MIT &copy; junai Labs**
 
 </div>
