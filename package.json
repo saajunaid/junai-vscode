@@ -2,7 +2,7 @@
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
   "description": "Agentic Engineering for GitHub Copilot. 25 specialist agents, 9 MCP tools, deterministic routing, 3 pipeline modes (supervised/assisted/autopilot), autopilot watcher, and safe managed-section copilot-instructions.md â€” your content is never overwritten. From idea to shipped.",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.101.0"
