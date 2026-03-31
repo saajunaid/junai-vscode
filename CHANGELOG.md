@@ -4,6 +4,26 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.7.3] — 2026-03-31
+
+### New Features
+
+- **Preflight agent** — New `preflight` specialist validates implementation plans against the actual codebase (API endpoints, type names, field names, dependencies, file paths, data shapes, transforms) before any coding begins. Routes to Planner on FAIL or directly to Implement on PASS. Supports standalone mode and full pipeline integration.
+- **skill-creator skill** — New `workflow/skill-creator` skill with a full evaluation framework: analyzer, comparator, and grader sub-agents; benchmark scripts; eval-viewer HTML report; and packaging utilities for authoring new skills from scratch.
+- **webapp-testing skill** — New `testing/webapp-testing` skill with Playwright-based automation patterns, element discovery, static HTML automation, and server-integrated test examples.
+- **high-end-visual-design skill** — New `frontend/high-end-visual-design` skill for premium visual UI work.
+- **windows-deployment skill** — New `devops/windows-deployment` skill for Windows-specific deployment patterns.
+- **New skill reference files** — Added `css-architecture/RESPONSIVE-DESIGN.md`, `design-system-tokens/DESIGN-SYSTEM-TEMPLATE.md`, `frontend/premium-react/MOTION-SPEC.md`, and `frontend/ux-design/ACCESSIBILITY.md` reference documents to existing skill categories.
+
+### Improvements
+
+- **UX Designer agent overhauled** — Merged the `ui-ux-designer` agent into `ux-designer`. The unified agent covers both generative design (JTBD, wireframes, specs) and evidence-based critique with NN Group citations. `ui-ux-designer.agent.md` removed.
+- **17 agents updated** — `accessibility`, `anchor`, `architect`, `code-reviewer`, `data-engineer`, `debug`, `frontend-developer`, `implement`, `janitor`, `mentor`, `orchestrator`, `planner`, `prd`, `prompt-engineer`, `sql-expert`, `streamlit-developer`, `tester` — all received refinements to protocols, routing logic, and output contracts.
+- **Orchestrator & Planner enhanced** — Improved handoff payload handling, intent verification, and multi-phase routing for assisted/autopilot modes.
+- **large-task-fidelity instructions updated** — Added Output Decay self-sweep rule with mechanically-detectable decay signal patterns.
+- **Pipeline tooling** — `agents.registry.json` updated with Preflight entry; `schema.py` and `pipeline-state.template.json` updated; pipeline flowchart refreshed.
+
+---
 ## [0.7.0] â€” 2026-03-26
 
 ### New Features
