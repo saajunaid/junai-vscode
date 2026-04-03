@@ -11,9 +11,6 @@ const JUNAI_SECTION_END   = '<!-- junai:end -->';
 const COPILOT_RUNTIME_DIR = '.github';
 const CLAUDE_RUNTIME_DIR = '.claude';
 const CODEX_RUNTIME_DIR = '.codex';
-const COPILOT_RUNTIME_DIR = '.github';
-const CLAUDE_RUNTIME_DIR = '.claude';
-const CODEX_RUNTIME_DIR = '.codex';
 
 function junaiManagedSection(): string {
     return [
@@ -158,7 +155,7 @@ function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
     });
 }
 
-export function deactruntime bundles into workspace .github/.claude/.codex
+export function deactivate() {}
 
 // ─────────────────────────────────────────────────────────────
 // junai.init — copy runtime bundles into workspace .github/.claude/.codex
@@ -187,7 +184,7 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
             { placeHolder: 'Select the workspace folder to initialize junai in' }
         );
         if (!picked) { return; }
-        targetFolder = picked.fsPath;COPILOT_RUNTIME_DIR
+        targetFolder = picked.fsPath;
     }
 
     const githubDir = path.join(targetFolder, COPILOT_RUNTIME_DIR);
@@ -203,11 +200,9 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
             'Overwrite', 'Cancel'
         );
         if (choice !== 'Overwrite') { return; }
-        // Backup project-config.md so the user can recover their customisations
         backupProjectConfig(githubDir);
     }
 
-    // Read the configured default mode
     const cfg  = vscode.workspace.getConfiguration('junai');
     const mode = cfg.get<string>('defaultMode', 'supervised');
 
@@ -216,7 +211,7 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
             location: vscode.ProgressLocation.Notification,
             title: 'junai',
             cancellable: false,
-        },installRuntimeBundles(poolDir, targetFolde
+        },
         async (progress) => {
             progress.report({ message: 'Copying agent pool…' });
             installRuntimeBundles(poolDir, targetFolder);
@@ -231,9 +226,7 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
             scaffoldMcpConfig(targetFolder);
             scaffoldVscodeSettings(targetFolder);
 
-            // Write pool version marker so activation check knows workspace is current
             writeWorkspacePoolVersion(context, githubDir);
-
             progress.report({ message: 'Done.' });
         }
     );
@@ -241,9 +234,7 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
     await promptProfileSelectionAfterInit(context, targetFolder);
 
     if (silent) {
-        vscode.window.showInformationMessage(
-            `✅ junai agent pipeline auto-initialized (mode: ${mode}).`
-        );
+        vscode.window.showInformationMessage(`✅ junai agent pipeline auto-initialized (mode: ${mode}).`);
         return;
     }
 
@@ -254,10 +245,7 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
     if (open === 'Open ARTIFACTS.md') {
         const artifactsPath = path.join(githubDir, 'agent-docs', 'ARTIFACTS.md');
         if (fs.existsSync(artifactsPath)) {
-            vscode.commands.executeCommand(
-                'markdown.showPreview',
-                vscode.Uri.file(artifactsPath)
-            );
+            vscode.commands.executeCommand('markdown.showPreview', vscode.Uri.file(artifactsPath));
         }
     }
 }
@@ -510,7 +498,7 @@ async function cmdRemove() {
     if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showErrorMessage('junai: No workspace folder open.');
         return;
-    } runtime folders, .claude runtime folders, .codex runtime folder
+    }
 
     const confirmed = await vscode.window.showWarningMessage(
         'This will delete the junai agent pool (.github runtime folders, .claude runtime folders, .codex runtime folders, pipeline-state.json) and remove the MCP entry from .vscode/mcp.json. Your own code and commits are NOT affected.',
@@ -518,11 +506,13 @@ async function cmdRemove() {
         'Remove junai from this project',
         'Cancel',
     );
-    if (confirmed !== 'Remove junai from this proCOPILOT_RUNTIME_DIR);
+    if (confirmed !== 'Remove junai from this project') { return; }
+
+    const targetFolder = workspaceFolders[0].uri.fsPath;
+    const githubDir    = path.join(targetFolder, COPILOT_RUNTIME_DIR);
     const claudeDir    = path.join(targetFolder, CLAUDE_RUNTIME_DIR);
     const codexDir     = path.join(targetFolder, CODEX_RUNTIME_DIR);
 
-    // Pool directories installed by init
     const poolDirs = [
         'agents', 'skills', 'prompts', 'instructions',
         'agent-docs', 'plans', 'handoffs', 'tools', 'diagrams',
@@ -540,31 +530,15 @@ async function cmdRemove() {
     const codexSkills = path.join(codexDir, 'skills');
     if (fs.existsSync(codexSkills)) { fs.rmSync(codexSkills, { recursive: true, force: true }); }
 
-    // Root files installed by init (except copilot-instructions.md — only strip managed section)
     for (const file of ['pipeline-state.json', 'project-config.md', '.junai-pool-version']) {
         const p = path.join(githubDir, file);
         if (fs.existsSync(p)) { fs.rmSync(p, { force: true }); }
     }
-    removeCopilotInstructionsSection(githubDir);
-    removeDirIfEmpty(claudeDir);
-    removeDirIfEmpty(codex'rules']) {
-        const p = path.join(claudeDir, dir);
-        if (fs.existsSync(p)) { fs.rmSync(p, { recursive: true, force: true }); }
-    }
 
-    const codexSkills = path.join(codexDir, 'skills');
-    if (fs.existsSync(codexSkills)) { fs.rmSync(codexSkills, { recursive: true, force: true }); }
-
-    // Root files installed by init (except copilot-instructions.md — only strip managed section)
-    for (const file of ['pipeline-state.json', 'project-config.md', '.junai-pool-version']) {
-        const p = path.join(githubDir, file);
-        if (fs.existsSync(p)) { fs.rmSync(p, { force: true }); }
-    }
     removeCopilotInstructionsSection(githubDir);
     removeDirIfEmpty(claudeDir);
     removeDirIfEmpty(codexDir);
 
-    // Remove junai entry from .vscode/mcp.json without deleting the whole file
     const mcpFile = path.join(targetFolder, '.vscode', 'mcp.json');
     if (fs.existsSync(mcpFile)) {
         try {
@@ -572,16 +546,13 @@ async function cmdRemove() {
             if (cfg.servers && cfg.servers['junai']) {
                 delete cfg.servers['junai'];
             }
-            // Also clean up legacy key name
             if (cfg.servers && cfg.servers['junai-pipeline']) {
                 delete cfg.servers['junai-pipeline'];
             }
             fs.writeFileSync(mcpFile, JSON.stringify(cfg, null, 2), 'utf8');
         } catch { /* leave mcp.json untouched if unreadable */ }
     }
-COPILOT_RUNTIME_DIR);
-    const claudeDir = path.join(workspaceFolders[0].uri.fsPath, CLAUDE_RUNTIME_DIR);
-    const codexDir  = path.join(workspaceFolders[0].uri.fsPath, CODEX_RUNTIME_DIR
+
     vscode.window.showInformationMessage('junai: Agent pool removed from this project. Re-run Initialize to restore it.');
 }
 
@@ -613,7 +584,22 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
             'Update',
             'Cancel',
         );
-        if (const runtimes: RuntimeBundleSpec[] = [
+        if (confirmed !== 'Update') { return; }
+    }
+
+    const poolDir = path.join(context.extensionPath, 'pool');
+    const USER_OWNED = new Set(['pipeline-state.json', 'project-config.md']);
+
+    let updated = 0;
+    let skipped = 0;
+    const git: { result: GitCommitResult } = { result: 'skipped-no-repo' };
+
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'junai', cancellable: false },
+        async (progress) => {
+            progress.report({ message: 'Updating agent pool…' });
+
+            const runtimes: RuntimeBundleSpec[] = [
                 {
                     poolRoot: path.join(poolDir, COPILOT_RUNTIME_DIR),
                     workspaceRoot: githubDir,
@@ -641,120 +627,16 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
             ];
 
             for (const runtime of runtimes) {
-                const counts = updateRuntimeBundle(runtime
-                },
-                {
-                    poolRoot: path.join(poolDir, CLAUDE_RUNTIME_DIR),
-                    workspaceRoot: claudeDir,
-                    cleanDirs: ['agents', 'skills', 'rules'],
-                    mergeDirs: [],
-                    rootFiles: [],
-                    userOwnedFiles: new Set(),
-                },
-                {
-                    poolRoot: path.join(poolDir, CODEX_RUNTIME_DIR),
-                    workspaceRoot: codexDir,
-                    cleanDirs: ['skills'],
-                    mergeDirs: [],
-                    rootFiles: [],
-                    userOwnedFiles: new Set(),
-                },
-            ];
-
-            for (const runtime of runtimes) {
                 const counts = updateRuntimeBundle(runtime);
                 updated += counts.updated;
                 skipped += counts.skipped;
             }
 
-            // Refresh only the managed section in copilot-instructions.md
             ensureCopilotInstructionsSection(githubDir);
-
-            // Write pool version marker so activation check knows workspace is current
             writeWorkspacePoolVersion(context, githubDir);
-
-            // Apply workspace settings fixes (idempotent — only sets if not already present)
             scaffoldMcpConfig(workspaceFolders[0].uri.fsPath);
             scaffoldVscodeSettings(workspaceFolders[0].uri.fsPath);
 
-type RuntimeBundleSpec = {
-    poolRoot: string;
-    workspaceRoot: string;
-    cleanDirs: string[];
-    mergeDirs: string[];
-    rootFiles: string[];
-    userOwnedFiles: Set<string>;
-};
-
-function installRuntimeBundles(poolDir: string, targetFolder: string): void {
-    const runtimes = [
-        { poolRoot: path.join(poolDir, COPILOT_RUNTIME_DIR), workspaceRoot: path.join(targetFolder, COPILOT_RUNTIME_DIR) },
-        { poolRoot: path.join(poolDir, CLAUDE_RUNTIME_DIR), workspaceRoot: path.join(targetFolder, CLAUDE_RUNTIME_DIR) },
-        { poolRoot: path.join(poolDir, CODEX_RUNTIME_DIR), workspaceRoot: path.join(targetFolder, CODEX_RUNTIME_DIR) },
-    ];
-
-    for (const runtime of runtimes) {
-        if (!fs.existsSync(runtime.poolRoot)) { continue; }
-        copyDirSync(runtime.poolRoot, runtime.workspaceRoot);
-    }
-}
-
-function updateRuntimeBundle(spec: RuntimeBundleSpec): { updated: number; skipped: number } {
-    let updated = 0;
-    let skipped = 0;
-    if (!fs.existsSync(spec.poolRoot)) { return { updated, skipped }; }
-
-    for (const dir of [...spec.cleanDirs, ...spec.mergeDirs]) {
-        const nested = path.join(spec.workspaceRoot, dir, dir);
-        if (fs.existsSync(nested)) {
-            fs.rmSync(nested, { recursive: true, force: true });
-        }
-    }
-
-    for (const dir of spec.cleanDirs) {
-        const src = path.join(spec.poolRoot, dir);
-        const dest = path.join(spec.workspaceRoot, dir);
-        if (!fs.existsSync(src)) { continue; }
-        if (fs.existsSync(dest)) {
-            fs.rmSync(dest, { recursive: true, force: true });
-        }
-        const counts = mergeDirSync(src, dest, spec.userOwnedFiles);
-        updated += counts.updated;
-        skipped += counts.skipped;
-    }
-
-    for (const dir of spec.mergeDirs) {
-        const src = path.join(spec.poolRoot, dir);
-        const dest = path.join(spec.workspaceRoot, dir);
-        if (!fs.existsSync(src)) { continue; }
-        const counts = mergeDirSync(src, dest, spec.userOwnedFiles);
-        updated += counts.updated;
-        skipped += counts.skipped;
-    }
-
-    for (const file of spec.rootFiles) {
-        const src = path.join(spec.poolRoot, file);
-        const dest = path.join(spec.workspaceRoot, file);
-        if (!fs.existsSync(src)) { continue; }
-        fs.mkdirSync(spec.workspaceRoot, { recursive: true });
-        if (spec.userOwnedFiles.has(file) && fs.existsSync(dest)) {
-            skipped++;
-            continue;
-        }
-        fs.copyFileSync(src, dest);
-        updated++;
-    }
-
-    return { updated, skipped };
-}
-
-function removeDirIfEmpty(dirPath: string): void {
-    if (!fs.existsSync(dirPath)) { return; }
-    if (fs.readdirSync(dirPath).length === 0) {
-        fs.rmSync(dirPath, { recursive: true, force: true });
-    }
-}
-            // Auto-commit pool files so they never appear as uncommitted noise in the user's working tree
             progress.report({ message: 'Committing pool update…' });
             git.result = gitCommitPoolUpdate(workspaceFolders[0].uri.fsPath, readBundledPoolVersion(context) ?? undefined);
 
@@ -770,9 +652,9 @@ function removeDirIfEmpty(dirPath: string): void {
     else if (git.result === 'skipped-in-progress') { msg += ' (git commit skipped — repo has an in-progress operation; commit manually)'; }
     else if (git.result === 'skipped-detached')    { msg += ' (git commit skipped — detached HEAD)'; }
     else if (git.result === 'error')               { msg += ' (git commit failed — commit manually if needed)'; }
-    // 'nothing-to-commit' and 'skipped-no-repo' are silent (no message suffix)
     vscode.window.showInformationMessage(msg);
 }
+
 // ─────────────────────────────────────────────────────────────
 const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.DS_Store']);
 type RuntimeBundleSpec = {
@@ -1120,24 +1002,10 @@ async function cmdProbeAutopilot(): Promise<void> {
     }
 
     channel.appendLine('');
-    channel.appendLine('Paste this output as coCOPILOT_RUNTIME_DIR);
-    const claudeDir = path.join(workspaceRoot, CLAUDE_RUNTIME_DIR);
-    const codexDir = path.join(workspaceRoot, CODEX_RUNTIME_DIR);
-    const relGithub = path.relative(gitRoot, githubDir).split(path.sep).join('/');
-    const stagePaths = [
-        ...['agents', 'tools', 'skills', 'instructions', 'prompts', 'diagrams', 'handoffs', 'agent-docs', 'plans'].map(d => `${relGithub}/${d}`),
-        `${relGithub}/copilot-instructions.md`,
-        `${relGithub}/.junai-pool-version`,
-    ];
+    channel.appendLine('Paste this output as context when implementing the real autopilot invoker.');
+    vscode.window.showInformationMessage(`junai probe: found ${relevant.length} chat commands. See "junai Autopilot Probe" output channel.`);
+}
 
-    if (fs.existsSync(claudeDir)) {
-        const relClaude = path.relative(gitRoot, claudeDir).split(path.sep).join('/');
-        stagePaths.push(`${relClaude}/agents`, `${relClaude}/skills`, `${relClaude}/rules`);
-    }
-    if (fs.existsSync(codexDir)) {
-        const relCodex = path.relative(gitRoot, codexDir).split(path.sep).join('/');
-        stagePaths.push(`${relCodex}/skills`);
-    }
 // ─────────────────────────────────────────────────────────────────────────────
 // Pool version helpers
 // ─────────────────────────────────────────────────────────────────────────────
