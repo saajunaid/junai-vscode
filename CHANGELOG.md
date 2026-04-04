@@ -4,6 +4,22 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.8.1] — 2026-04-04
+
+### New Features
+
+- **Recipe discovery in managed section** — Recipe-Driven Delivery instructions now embedded inside the `<!-- junai:start -->` sentinel markers in `copilot-instructions.md`. Every project gets recipe discovery automatically on extension install/update — no manual copy needed. Works with ALL AI tools (Copilot, Claude, Cursor, Windsurf, Codex).
+- **Recipe selection in profile flow** — After selecting a project profile, the extension now prompts for recipe selection via quick-pick. Scans `.github/recipes/` for available `.recipe.md` files. Writes the selected recipe to `project-config.md` automatically.
+- **PROJECT-ONBOARDING-RUNBOOK.md** — Comprehensive end-to-end onboarding guide covering the full process from `platform-infra` bootstrap through junai extension pool deployment to pipeline kickoff. Includes all commands, parameters, and troubleshooting.
+- **`validation-discipline.instructions.md` promoted to pool** — Previously only in project-template, now available to all projects via pool deployment.
+
+### Improvements
+
+- **RECIPE-RUNBOOK.md updated** — Fresh project scenario now documents the correct flow (platform-infra bootstrap → extension pool deploy → profile/recipe selection). Standalone mode section updated to explain managed-section deployment mechanism.
+- **project-template cleanup** — Removed stale `.github/instructions/` folder (was 14 files behind pool's 26, with 1 outdated). Instructions now deployed exclusively by the extension pool, eliminating version drift.
+
+---
+
 ## [0.8.0] — 2026-04-03
 
 ### New Features

@@ -25,6 +25,18 @@ function junaiManagedSection(): string {
         '>',
         '> Start with `@Orchestrator` in Copilot Chat.',
         '',
+        '## Recipe-Driven Delivery',
+        '',
+        'When working on **data-to-UI tasks** (new features, dashboards, data integrations — not bug fixes, refactors, or docs-only work):',
+        '',
+        '1. Read `.github/project-config.md` — check if a `recipe` field is set in Step 1',
+        '2. If set, read `.github/recipes/{recipe}.recipe.md`',
+        '3. Follow the recipe\'s **Delivery Pipeline** as your mandatory phase sequence',
+        '4. Load the recipe\'s **Mandatory Skills** for each phase you work on',
+        '5. Apply the recipe\'s **Cross-Skill Conventions** (naming chains, directory structure, chart styling)',
+        '',
+        'If no recipe is set, work normally using your built-in expertise and any skills loaded via other mechanisms.',
+        '',
         JUNAI_SECTION_END,
     ].join('\n');
 }
@@ -329,6 +341,9 @@ async function cmdSelectProfile(
         vscode.window.showInformationMessage(`junai: project profile set to ${finalLabel}.`);
     }
 
+    // Prompt recipe selection after profile is set
+    await promptRecipeSelection(targetFolder, silent);
+
     const storageKey = `junai.profilePrompted.${targetFolder}`;
     await context.workspaceState.update(storageKey, true);
 }
@@ -404,6 +419,59 @@ function setProfileValue(markdown: string, profile: string): string {
     return markdown.replace(
         /^\|\s*\*\*profile\*\*\s*\|\s*.*?\s*\|\s*$/im,
         `| **profile** | ${formatted} |`
+    );
+}
+
+async function promptRecipeSelection(targetFolder: string, silent: boolean): Promise<void> {
+    const recipesDir = path.join(targetFolder, '.github', 'recipes');
+    if (!fs.existsSync(recipesDir)) { return; }
+
+    const recipeFiles = fs.readdirSync(recipesDir)
+        .filter(f => f.endsWith('.recipe.md'))
+        .map(f => f.replace('.recipe.md', ''));
+    if (recipeFiles.length === 0) { return; }
+
+    // Check if recipe is already set
+    const projectConfigPath = path.join(targetFolder, '.github', 'project-config.md');
+    if (!fs.existsSync(projectConfigPath)) { return; }
+    const raw = fs.readFileSync(projectConfigPath, 'utf8');
+    const currentRecipe = currentRecipeValue(raw);
+    if (currentRecipe.length > 0) { return; } // already set
+
+    if (silent) { return; } // don't prompt in silent mode
+
+    const options: vscode.QuickPickItem[] = recipeFiles.map(name => ({
+        label: name,
+        description: `Use .github/recipes/${name}.recipe.md delivery workflow`,
+    }));
+    options.push({
+        label: 'none',
+        description: 'No recipe — agents work with built-in expertise only',
+    });
+
+    const picked = await vscode.window.showQuickPick(options, {
+        placeHolder: 'Select a delivery recipe (optional — defines mandatory skill pipeline for data-to-UI tasks)',
+    });
+    if (!picked || picked.label === 'none') { return; }
+
+    const updatedConfig = setRecipeValue(raw, picked.label);
+    if (updatedConfig !== raw) {
+        fs.writeFileSync(projectConfigPath, updatedConfig, 'utf8');
+        vscode.window.showInformationMessage(`junai: recipe set to ${picked.label}.`);
+    }
+}
+
+function currentRecipeValue(markdown: string): string {
+    const row = markdown.match(/^\|\s*\*\*recipe\*\*\s*\|\s*(.*?)\s*\|\s*$/im);
+    if (!row || row.length < 2) { return ''; }
+    return row[1].replace(/`/g, '').trim();
+}
+
+function setRecipeValue(markdown: string, recipe: string): string {
+    const formatted = recipe ? `\`${recipe}\`` : '``';
+    return markdown.replace(
+        /^\|\s*\*\*recipe\*\*\s*\|\s*.*?\s*\|\s*$/im,
+        `| **recipe** | ${formatted} |`
     );
 }
 
