@@ -125,6 +125,26 @@
           ],
           "default": "prompt",
           "description": "Controls automatic agent pipeline initialization when VS Code opens a workspace. prompt = offer with a notification; always = initialize silently on first open; never = suppress all activation prompts."
+        },
+        "junai.experimental.coordinator": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Coordinator Mode — fan out tasks to parallel workers and synthesize results. Experimental."
+        },
+        "junai.experimental.dream": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Dream Memory Consolidation — automatic background memory pruning and promotion after sessions. Experimental."
+        },
+        "junai.experimental.deepPlan": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Deep Plan Mode — long-think planning lane for complex features before implementation. Experimental."
+        },
+        "junai.experimental.proactive": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable KAIROS-lite Proactive Assistant — opt-in low-noise notifications for meaningful pipeline events. Experimental."
         }
       }
     }

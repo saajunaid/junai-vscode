@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
+import { getAllFlags } from './featureFlags';
 
 // ─────────────────────────────────────────────────────────────
 // Managed section in copilot-instructions.md
@@ -511,6 +512,8 @@ async function cmdStatus() {
     channel.appendLine(`  Mode        : ${state.mode}`);
     channel.appendLine(`  Initialized : ${state.initialized}`);
     channel.appendLine(`  Version     : ${state.version}`);
+    const flags = getAllFlags();
+    channel.appendLine(`  Flags       : coordinator=${flags.coordinator} dream=${flags.dream} deepPlan=${flags.deepPlan} proactive=${flags.proactive}`);
     channel.appendLine('─────────────────────────────────────────────');
 }
 
