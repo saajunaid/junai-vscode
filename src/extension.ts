@@ -4,6 +4,7 @@ import * as path from 'path';
 import { spawnSync } from 'child_process';
 import { getAllFlags } from './featureFlags';
 import { getAllClassifications } from './permissions';
+import { JunaiEventBus } from './eventBus';
 
 // ─────────────────────────────────────────────────────────────
 // Managed section in copilot-instructions.md
@@ -124,6 +125,17 @@ export function activate(context: vscode.ExtensionContext) {
     // Start autopilot watcher — fires when pipeline-state.json routing_decision appears in autopilot
     startAutopilotWatcher(context);
 
+    // Initialize event bus — consumers can subscribe via JunaiEventBus.getInstance()
+    const eventBus = JunaiEventBus.getInstance();
+
+    // Log all events to the output channel for debugging
+    const outputChannel = vscode.window.createOutputChannel('junai Events');
+    context.subscriptions.push({ dispose: () => { eventBus.dispose(); outputChannel.dispose(); } });
+
+    eventBus.onAny((event) => {
+        outputChannel.appendLine(`[${event.timestamp}] ${event.type} from ${event.source}: ${JSON.stringify(event)}`);
+    });
+
     // MCP server is registered via .vscode/mcp.json (written by junai.init → scaffoldMcpConfig).
     // No dynamic registerMcpServerDefinitionProvider needed — the mcp.json key "junai" must match
     // the tool prefix in agent frontmatter (e.g. junai/notify_orchestrator).
@@ -169,7 +181,9 @@ function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
     });
 }
 
-export function deactivate() {}
+export function deactivate() {
+    JunaiEventBus.getInstance().dispose();
+}
 
 // ─────────────────────────────────────────────────────────────
 // junai.init — copy runtime bundles into workspace .github/.claude/.codex
@@ -520,6 +534,13 @@ async function cmdStatus() {
     const medCount  = classifications.filter(c => c.tier === 'medium').length;
     const lowCount  = classifications.filter(c => c.tier === 'low').length;
     channel.appendLine(`  Permissions : ${lowCount} low / ${medCount} medium / ${highCount} high risk actions classified`);
+    const recentEvents = JunaiEventBus.getInstance().getRecentEvents(5);
+    channel.appendLine(`  Events      : ${recentEvents.length} recent events in log`);
+    if (recentEvents.length > 0) {
+        for (const evt of recentEvents) {
+            channel.appendLine(`    • [${evt.type}] ${evt.source} — ${evt.timestamp}`);
+        }
+    }
     channel.appendLine('─────────────────────────────────────────────');
 }
 
@@ -990,6 +1011,14 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
             // Pipeline closed — no agent to route to
             if (!targetAgent || targetAgent === 'None') {
                 channel.appendLine(`  ✅ Pipeline reached closed state — no further routing needed.`);
+                JunaiEventBus.getInstance().emit({
+                    type: 'task-completed',
+                    timestamp: new Date().toISOString(),
+                    source: 'autopilot-watcher',
+                    stage: 'pipeline-closed',
+                    agent: 'none',
+                    summary: `Pipeline closed — ${state.feature ?? 'feature'} complete`,
+                });
                 vscode.window.showInformationMessage(
                     `junai autopilot: ✅ Pipeline closed — ${state.feature ?? 'feature'} complete.`,
                     'View Log'
@@ -1023,6 +1052,14 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
             }
 
             channel.appendLine(`  ✓ Opened @${targetAgent} — routing prompt sent as query (also in clipboard)`);
+            JunaiEventBus.getInstance().emit({
+                type: 'task-completed',
+                timestamp: new Date().toISOString(),
+                source: 'autopilot-watcher',
+                stage,
+                agent: targetAgent,
+                summary: `Routed to @${targetAgent} for stage: ${stage}`,
+            });
             vscode.window.showInformationMessage(
                 `junai autopilot: ✅ @${targetAgent} invoked — stage: ${stage}`,
                 'View Log'
