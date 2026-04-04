@@ -1,5 +1,6 @@
 import { JunaiEventBus } from './eventBus';
 import { requireFeature } from './featureFlags';
+import { checkPermission } from './permissions';
 
 // ─────────────────────────────────────────────────────────────
 // Worker types
@@ -389,4 +390,135 @@ export function synthesizeResults(
     }
 
     return sections.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────
+// Main coordination runner
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Execute a full coordination run:
+ * 1. Validate the feature flag is enabled
+ * 2. Build the task graph
+ * 3. Execute workers in parallel
+ * 4. Emit events for progress and completion
+ * 5. Synthesize all results into one output
+ */
+export async function coordinate(
+    request: CoordinationRequest,
+    workspaceRoot: string,
+): Promise<CoordinationResult> {
+    requireFeature('coordinator');
+
+    const eventBus = JunaiEventBus.getInstance();
+    const graph = new TaskGraph();
+    const startTime = Date.now();
+
+    for (const worker of request.workers) {
+        graph.addWorker(worker);
+    }
+
+    const settledResults = await Promise.allSettled(
+        graph.getPendingWorkers().map(async (worker): Promise<TaskResult> => {
+            const action = worker.type === 'explore' ? 'search_workspace' : 'read_file';
+            const permission = checkPermission(action, 'autopilot');
+
+            if (!permission.allowed) {
+                const blockedResult: TaskResult = {
+                    workerId: worker.id,
+                    workerType: worker.type,
+                    label: worker.label,
+                    status: 'failure',
+                    output: '',
+                    durationMs: 0,
+                    error: permission.reason,
+                };
+                graph.markCompleted(worker.id, blockedResult);
+                eventBus.emit({
+                    type: 'task-blocked',
+                    timestamp: new Date().toISOString(),
+                    source: 'coordinator',
+                    stage: 'coordinate',
+                    agent: worker.label,
+                    reason: permission.reason,
+                });
+                return blockedResult;
+            }
+
+            graph.markRunning(worker.id);
+            const result = await executeWorker(worker, workspaceRoot);
+            graph.markCompleted(worker.id, result);
+
+            if (result.status === 'success') {
+                eventBus.emit({
+                    type: 'task-completed',
+                    timestamp: new Date().toISOString(),
+                    source: 'coordinator',
+                    stage: 'coordinate',
+                    agent: worker.label,
+                    summary: `Worker ${worker.id} completed successfully`,
+                });
+            } else {
+                eventBus.emit({
+                    type: 'task-blocked',
+                    timestamp: new Date().toISOString(),
+                    source: 'coordinator',
+                    stage: 'coordinate',
+                    agent: worker.label,
+                    reason: result.error ?? 'Worker failed',
+                });
+            }
+
+            return result;
+        })
+    );
+
+    const workerResults: TaskResult[] = settledResults.map((settled, index) => {
+        if (settled.status === 'fulfilled') {
+            return settled.value;
+        }
+
+        const worker = request.workers[index];
+        const failureResult: TaskResult = {
+            workerId: worker.id,
+            workerType: worker.type,
+            label: worker.label,
+            status: 'failure',
+            output: '',
+            durationMs: 0,
+            error: settled.reason instanceof Error ? settled.reason.message : String(settled.reason),
+        };
+        graph.markCompleted(worker.id, failureResult);
+        eventBus.emit({
+            type: 'task-blocked',
+            timestamp: new Date().toISOString(),
+            source: 'coordinator',
+            stage: 'coordinate',
+            agent: worker.label,
+            reason: failureResult.error ?? 'Worker failed',
+        });
+        return failureResult;
+    });
+
+    const synthesizedOutput = synthesizeResults(request.goal, workerResults);
+    const totalDurationMs = Date.now() - startTime;
+    const summary = graph.getSummary();
+
+    eventBus.emit({
+        type: 'task-completed',
+        timestamp: new Date().toISOString(),
+        source: 'coordinator',
+        stage: 'coordinate',
+        agent: 'Coordinator',
+        summary: `Coordination complete — ${summary.completed} completed, ${summary.failed} failed`,
+    });
+
+    return {
+        title: request.title,
+        goal: request.goal,
+        workerResults,
+        synthesizedOutput,
+        totalDurationMs,
+        summary,
+    };
 }
