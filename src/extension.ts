@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
 import { getAllFlags } from './featureFlags';
+import { getAllClassifications } from './permissions';
 
 // ─────────────────────────────────────────────────────────────
 // Managed section in copilot-instructions.md
@@ -514,6 +515,11 @@ async function cmdStatus() {
     channel.appendLine(`  Version     : ${state.version}`);
     const flags = getAllFlags();
     channel.appendLine(`  Flags       : coordinator=${flags.coordinator} dream=${flags.dream} deepPlan=${flags.deepPlan} proactive=${flags.proactive}`);
+    const classifications = getAllClassifications();
+    const highCount = classifications.filter(c => c.tier === 'high').length;
+    const medCount  = classifications.filter(c => c.tier === 'medium').length;
+    const lowCount  = classifications.filter(c => c.tier === 'low').length;
+    channel.appendLine(`  Permissions : ${lowCount} low / ${medCount} medium / ${highCount} high risk actions classified`);
     channel.appendLine('─────────────────────────────────────────────');
 }
 
