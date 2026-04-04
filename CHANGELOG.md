@@ -4,6 +4,23 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.8.2] — 2026-04-04
+
+### New Features
+
+- **Data-contract-pipeline DB discovery** — `extract_schema.py` now supports full database discovery: `--discover` enumerates all tables/views with columns, primary keys, and foreign key relationships. `--sample N` fetches rows for type inference and detects embedded structured data (JSON, XML, YAML, markdown, pipe-delimited) inside string columns. `--schema` targets specific DB schemas (dbo, public, etc.).
+- **Multi-DB type coverage** — SQL type map expanded from SQL Server-only to include PostgreSQL (JSONB, UUID, ARRAY, TIMESTAMPTZ, BOOLEAN, SERIAL, BYTEA, CITEXT, INET), MySQL (ENUM, SET, MEDIUMTEXT, LONGBLOB), and SQLite types.
+- **FK-based DTO nesting** — Foreign key relationships extracted during discovery inform DTO nesting suggestions and multi-table join patterns.
+- **Natural-language DB intent** — Skill instructions updated so agents detect "data is in the database" naturally without requiring CLI flags from users.
+
+### Improvements
+
+- **SKILL.md Step 1.5 — DB Discovery** — New pipeline phase for database sources: discover → sample → embedded format detect → multi-table aggregate → relationship map. Feeds into existing Step 2+ pipeline unchanged.
+- **Drift check catalog** — Two new checks: D13 (embedded format in string column not extracted to typed model), D14 (FK relationship exists but DTO is flat).
+- **DB Discovery & Sampling docs** — Connection string examples for SQL Server, PostgreSQL, MySQL, SQLite added to Scripts section.
+
+---
+
 ## [0.8.1] — 2026-04-04
 
 ### New Features
