@@ -5,6 +5,7 @@ import { spawnSync } from 'child_process';
 import { getAllFlags } from './featureFlags';
 import { getAllClassifications } from './permissions';
 import { JunaiEventBus } from './eventBus';
+import { coordinate, CoordinationRequest } from './coordinator';
 
 // ─────────────────────────────────────────────────────────────
 // Managed section in copilot-instructions.md
@@ -120,6 +121,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.remove',          () => cmdRemove()),
         vscode.commands.registerCommand('junai.update',          (opts?: { silent?: boolean }) => cmdUpdate(context, opts)),
         vscode.commands.registerCommand('junai.probeAutopilot',  () => cmdProbeAutopilot()),
+        vscode.commands.registerCommand('junai.coordinate',      () => cmdCoordinate()),
     );
 
     // Start autopilot watcher — fires when pipeline-state.json routing_decision appears in autopilot
@@ -1118,6 +1120,89 @@ async function cmdProbeAutopilot(): Promise<void> {
     channel.appendLine('');
     channel.appendLine('Paste this output as context when implementing the real autopilot invoker.');
     vscode.window.showInformationMessage(`junai probe: found ${relevant.length} chat commands. See "junai Autopilot Probe" output channel.`);
+}
+
+// ─────────────────────────────────────────────────────────────
+// junai.coordinate — run coordinator mode (experimental)
+// ─────────────────────────────────────────────────────────────
+async function cmdCoordinate() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('junai: No workspace folder open.');
+        return;
+    }
+
+    const goal = await vscode.window.showInputBox({
+        prompt: 'What should Coordinator Mode investigate?',
+        placeHolder: 'e.g. review the extension architecture and verify coordinator-related files',
+        ignoreFocusOut: true,
+    });
+    if (!goal) { return; }
+
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+    const channel = vscode.window.createOutputChannel('junai Coordinator');
+    channel.show(true);
+    channel.appendLine('=== junai Coordinator ===');
+    channel.appendLine(`Goal: ${goal}`);
+    channel.appendLine('Launching 3 read-only workers...');
+    channel.appendLine('');
+
+    const request: CoordinationRequest = {
+        title: 'Coordinator Mode Run',
+        goal,
+        workers: [
+            {
+                id: 'explore-1',
+                type: 'explore',
+                label: 'Explore workspace structure',
+                prompt: `Explore the workspace areas most relevant to: ${goal}`,
+                scopePaths: ['src', 'package.json'],
+            },
+            {
+                id: 'verify-1',
+                type: 'verify',
+                label: 'Verify coordinator targets',
+                prompt: `Verify that the main coordinator-related files for this goal exist and are readable: ${goal}`,
+                scopePaths: ['src/extension.ts', 'src/coordinator.ts', 'package.json'],
+            },
+            {
+                id: 'review-1',
+                type: 'review',
+                label: 'Review implementation signals',
+                prompt: `Review the current implementation for patterns, exports, and TODOs related to: ${goal}`,
+                scopePaths: ['src/extension.ts', 'src/coordinator.ts'],
+            },
+        ],
+    };
+
+    try {
+        const result = await vscode.window.withProgress(
+            {
+                location: vscode.ProgressLocation.Notification,
+                title: 'junai Coordinator',
+                cancellable: false,
+            },
+            async () => coordinate(request, workspaceRoot)
+        );
+
+        channel.appendLine(`Completed in ${result.totalDurationMs}ms`);
+        channel.appendLine(`Summary: ${result.summary.completed} completed / ${result.summary.failed} failed / ${result.summary.total} total`);
+        channel.appendLine('');
+        channel.appendLine(result.synthesizedOutput);
+
+        vscode.window.showInformationMessage(
+            `junai coordinator: completed ${result.summary.total} workers in ${result.totalDurationMs}ms.`,
+            'View Output'
+        ).then(choice => {
+            if (choice === 'View Output') {
+                channel.show(true);
+            }
+        });
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        channel.appendLine(`Error: ${message}`);
+        vscode.window.showWarningMessage(message);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -96,6 +96,11 @@
         "command": "junai.probeAutopilot",
         "title": "Probe Autopilot Chat Commands (dry run)",
         "category": "junai"
+      },
+      {
+        "command": "junai.coordinate",
+        "title": "Run Coordinator Mode (experimental)",
+        "category": "junai"
       }
     ],
     "configuration": {
