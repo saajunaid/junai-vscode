@@ -4,6 +4,15 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.9.1] — 2026-04-06
+
+### New Commands
+
+- **`junai: Initialize Agent Pool`** — deploys the full agent pool (`.github/`, `.claude/`, `.codex/`) without creating `pipeline-state.json`. For teams that want standalone agents and skills without pipeline orchestration. Prompts for profile and recipe after deploy.
+- **`junai: Set Recipe`** — standalone recipe picker. Scans `.github/recipes/*.recipe.md` and lets you set or change the recipe in `project-config.md` at any time, not just during initialization. Shows the currently selected recipe in the placeholder so it's clear what's already configured.
+
+---
+
 ## [0.9.0] — 2026-04-06
 
 ### New Features

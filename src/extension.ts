@@ -2,10 +2,13 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
-import { getAllFlags } from './featureFlags';
+import { getExperimentalFeatureManifest, getExperimentalFeatureStatus, isFeatureEnabled, requireFeature } from './featureFlags';
 import { getAllClassifications } from './permissions';
 import { JunaiEventBus } from './eventBus';
 import { coordinate, CoordinationRequest } from './coordinator';
+import { createDreamMemoryService, type DreamMemoryService, readDreamMemorySummary } from './dreamMemory';
+import { buildDeepPlanRequest, createDeepPlanResult, persistDeepPlanMarkdown, renderDeepPlanMarkdown } from './deepPlan';
+import { createProactiveAssistantService, type ProactiveAssistantService } from './proactiveAssistant';
 
 // ─────────────────────────────────────────────────────────────
 // Managed section in copilot-instructions.md
@@ -15,6 +18,9 @@ const JUNAI_SECTION_END   = '<!-- junai:end -->';
 const COPILOT_RUNTIME_DIR = '.github';
 const CLAUDE_RUNTIME_DIR = '.claude';
 const CODEX_RUNTIME_DIR = '.codex';
+
+let dreamMemoryService: DreamMemoryService | null = null;
+let proactiveAssistantService: ProactiveAssistantService | null = null;
 
 function junaiManagedSection(): string {
     return [
@@ -40,6 +46,8 @@ function junaiManagedSection(): string {
         '5. Apply the recipe\'s **Cross-Skill Conventions** (naming chains, directory structure, chart styling)',
         '',
         'If no recipe is set, work normally using your built-in expertise and any skills loaded via other mechanisms.',
+        '',
+        'For complex, ambiguous, or risky tasks, run `junai.deepPlan` from the Command Palette to generate a phased plan before implementation.',
         '',
         JUNAI_SECTION_END,
     ].join('\n');
@@ -120,9 +128,12 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.setMode',         () => cmdSetMode()),
         vscode.commands.registerCommand('junai.remove',          () => cmdRemove()),
         vscode.commands.registerCommand('junai.update',          (opts?: { silent?: boolean }) => cmdUpdate(context, opts)),
+        vscode.commands.registerCommand('junai.initPool',        () => cmdInitPool(context)),
+        vscode.commands.registerCommand('junai.setRecipe',       () => cmdSetRecipe()),
         vscode.commands.registerCommand('junai.probeAutopilot',  () => cmdProbeAutopilot()),
-        vscode.commands.registerCommand('junai.coordinate',      () => cmdCoordinate()),
     );
+
+    registerExperimentalCommands(context);
 
     // Start autopilot watcher — fires when pipeline-state.json routing_decision appears in autopilot
     startAutopilotWatcher(context);
@@ -138,6 +149,23 @@ export function activate(context: vscode.ExtensionContext) {
         outputChannel.appendLine(`[${event.timestamp}] ${event.type} from ${event.source}: ${JSON.stringify(event)}`);
     });
 
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot && isFeatureEnabled('proactive')) {
+        const proactiveChannel = vscode.window.createOutputChannel('junai Proactive');
+        proactiveAssistantService = createProactiveAssistantService(eventBus, proactiveChannel);
+        context.subscriptions.push(proactiveAssistantService, proactiveChannel);
+    } else {
+        proactiveAssistantService = null;
+    }
+
+    if (workspaceRoot && isFeatureEnabled('dream')) {
+        const dreamChannel = vscode.window.createOutputChannel('junai Dream');
+        dreamMemoryService = createDreamMemoryService(workspaceRoot, eventBus, dreamChannel);
+        context.subscriptions.push(dreamMemoryService, dreamChannel);
+    } else {
+        dreamMemoryService = null;
+    }
+
     // MCP server is registered via .vscode/mcp.json (written by junai.init → scaffoldMcpConfig).
     // No dynamic registerMcpServerDefinitionProvider needed — the mcp.json key "junai" must match
     // the tool prefix in agent frontmatter (e.g. junai/notify_orchestrator).
@@ -147,6 +175,22 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Auto-update nudge — notify when workspace pool is behind the installed extension
     checkPoolUpdate(context);
+}
+
+type ExperimentalCommandHandler = () => void | Promise<void>;
+
+const experimentalCommandHandlers: Readonly<Record<string, ExperimentalCommandHandler>> = {
+    'junai.coordinate': () => cmdCoordinate(),
+    'junai.deepPlan': () => cmdDeepPlan(),
+};
+
+function registerExperimentalCommands(context: vscode.ExtensionContext): void {
+    for (const feature of getExperimentalFeatureManifest()) {
+        if (!feature.implemented || !feature.commandId) { continue; }
+        const handler = experimentalCommandHandlers[feature.commandId];
+        if (!handler) { continue; }
+        context.subscriptions.push(vscode.commands.registerCommand(feature.commandId, handler));
+    }
 }
 
 function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
@@ -184,6 +228,10 @@ function promptWelcomeIfNeeded(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate() {
+    proactiveAssistantService?.dispose();
+    proactiveAssistantService = null;
+    dreamMemoryService?.dispose();
+    dreamMemoryService = null;
     JunaiEventBus.getInstance().dispose();
 }
 
@@ -529,8 +577,35 @@ async function cmdStatus() {
     channel.appendLine(`  Mode        : ${state.mode}`);
     channel.appendLine(`  Initialized : ${state.initialized}`);
     channel.appendLine(`  Version     : ${state.version}`);
-    const flags = getAllFlags();
-    channel.appendLine(`  Flags       : coordinator=${flags.coordinator} dream=${flags.dream} deepPlan=${flags.deepPlan} proactive=${flags.proactive}`);
+    const featureStatuses = getExperimentalFeatureStatus();
+    channel.appendLine(`  Flags       : ${featureStatuses.map(feature => `${feature.flag}=${feature.enabled}`).join(' ')}`);
+    channel.appendLine('  Experimental:');
+    for (const feature of featureStatuses) {
+        const liveState = feature.implemented ? 'live' : 'coming soon';
+        const commandInfo = feature.commandId ? ` | command=${feature.commandId}` : '';
+        const comingSoonNote = !feature.implemented && feature.comingSoon ? ` | ${feature.comingSoon}` : '';
+        channel.appendLine(`    • ${feature.statusLabel}: ${feature.enabled ? 'enabled' : 'disabled'} | ${liveState}${commandInfo}${comingSoonNote}`);
+    }
+
+    const dreamFeature = featureStatuses.find(feature => feature.flag === 'dream');
+    if (dreamFeature?.enabled) {
+        const dreamSummary = readDreamMemorySummary(workspaceFolders[0].uri.fsPath);
+        if (dreamSummary) {
+            channel.appendLine(`  Dream       : ${dreamSummary.factCount} facts, ${dreamSummary.runs} runs, last=${dreamSummary.lastUpdatedAt}`);
+        } else {
+            channel.appendLine('  Dream       : enabled, awaiting first consolidation pass');
+        }
+    } else if (dreamFeature?.implemented) {
+        channel.appendLine('  Dream       : available (disabled)');
+    }
+
+    const proactiveFeature = featureStatuses.find(feature => feature.flag === 'proactive');
+    if (proactiveFeature?.enabled) {
+        channel.appendLine('  Proactive   : enabled (KAIROS-lite, low-noise notices)');
+    } else if (proactiveFeature?.implemented) {
+        channel.appendLine('  Proactive   : available (disabled)');
+    }
+
     const classifications = getAllClassifications();
     const highCount = classifications.filter(c => c.tier === 'high').length;
     const medCount  = classifications.filter(c => c.tier === 'medium').length;
@@ -540,7 +615,7 @@ async function cmdStatus() {
     channel.appendLine(`  Events      : ${recentEvents.length} recent events in log`);
     if (recentEvents.length > 0) {
         for (const evt of recentEvents) {
-            channel.appendLine(`    • [${evt.type}] ${evt.source} — ${evt.timestamp}`);
+            channel.appendLine(`    • [${evt.severity}] [${evt.type}] ${evt.title} — ${evt.timestamp}`);
         }
     }
     channel.appendLine('─────────────────────────────────────────────');
@@ -753,6 +828,103 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     else if (git.result === 'skipped-detached')    { msg += ' (git commit skipped — detached HEAD)'; }
     else if (git.result === 'error')               { msg += ' (git commit failed — commit manually if needed)'; }
     vscode.window.showInformationMessage(msg);
+}
+
+// ─────────────────────────────────────────────────────────────
+// junai.initPool — deploy agent pool only (no pipeline-state.json)
+// For teams that want standalone agents/skills without pipeline orchestration.
+// ─────────────────────────────────────────────────────────────
+async function cmdInitPool(context: vscode.ExtensionContext): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders?.length) {
+        vscode.window.showErrorMessage('junai: No workspace folder open. Open a project folder first.');
+        return;
+    }
+
+    const targetFolder = workspaceFolders.length === 1
+        ? workspaceFolders[0].uri.fsPath
+        : await pickTargetFolder();
+    if (!targetFolder) { return; }
+
+    const githubDir = path.join(targetFolder, '.github');
+    const poolDir   = path.join(context.extensionPath, 'pool');
+
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'junai: Deploying agent pool…', cancellable: false },
+        async () => {
+            installRuntimeBundles(poolDir, targetFolder);
+            ensureCopilotInstructionsSection(githubDir);
+            scaffoldMcpConfig(targetFolder);
+            scaffoldVscodeSettings(targetFolder);
+            writeWorkspacePoolVersion(context, githubDir);
+        }
+    );
+
+    const sel = await vscode.window.showInformationMessage(
+        'junai: Agent pool deployed. Agents and skills are ready — no pipeline-state.json created.',
+        'Select Profile', 'Set Recipe'
+    );
+    if (sel === 'Select Profile') { vscode.commands.executeCommand('junai.selectProfile'); }
+    if (sel === 'Set Recipe')     { vscode.commands.executeCommand('junai.setRecipe'); }
+}
+
+// ─────────────────────────────────────────────────────────────
+// junai.setRecipe — standalone recipe picker (works any time, not just on init)
+// ─────────────────────────────────────────────────────────────
+async function cmdSetRecipe(): Promise<void> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders?.length) {
+        vscode.window.showErrorMessage('junai: No workspace folder open.');
+        return;
+    }
+
+    const targetFolder = workspaceFolders.length === 1
+        ? workspaceFolders[0].uri.fsPath
+        : await pickTargetFolder();
+    if (!targetFolder) { return; }
+
+    const projectConfigPath = path.join(targetFolder, '.github', 'project-config.md');
+    if (!fs.existsSync(projectConfigPath)) {
+        vscode.window.showErrorMessage('junai: project-config.md not found. Run Initialize Agent Pipeline or Initialize Agent Pool first.');
+        return;
+    }
+
+    const recipesDir = path.join(targetFolder, '.github', 'recipes');
+    if (!fs.existsSync(recipesDir)) {
+        vscode.window.showErrorMessage('junai: .github/recipes/ not found.');
+        return;
+    }
+
+    const recipeFiles = fs.readdirSync(recipesDir)
+        .filter(f => f.endsWith('.recipe.md'))
+        .map(f => f.replace('.recipe.md', ''));
+    if (recipeFiles.length === 0) {
+        vscode.window.showErrorMessage('junai: No .recipe.md files found in .github/recipes/');
+        return;
+    }
+
+    const raw     = fs.readFileSync(projectConfigPath, 'utf8');
+    const current = currentRecipeValue(raw);
+
+    const options: vscode.QuickPickItem[] = recipeFiles.map(name => ({
+        label:       name,
+        description: name === current ? '(currently selected)' : `Use .github/recipes/${name}.recipe.md`,
+    }));
+    options.push({ label: 'none', description: 'No recipe — agents work with built-in expertise only' });
+
+    const picked = await vscode.window.showQuickPick(options, {
+        placeHolder: current ? `Current recipe: ${current} — select to change` : 'Select a delivery recipe',
+    });
+    if (!picked) { return; }
+
+    const newRecipe     = picked.label === 'none' ? '' : picked.label;
+    const updatedConfig = setRecipeValue(raw, newRecipe);
+    if (updatedConfig !== raw) {
+        fs.writeFileSync(projectConfigPath, updatedConfig, 'utf8');
+        vscode.window.showInformationMessage(`junai: recipe set to ${newRecipe || 'none'}.`);
+    } else {
+        vscode.window.showInformationMessage(`junai: recipe unchanged (${current || 'none'}).`);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1017,6 +1189,9 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
                     type: 'task-completed',
                     timestamp: new Date().toISOString(),
                     source: 'autopilot-watcher',
+                    severity: 'success',
+                    title: 'Pipeline closed',
+                    detail: `${state.feature ?? 'feature'} complete`,
                     stage: 'pipeline-closed',
                     agent: 'none',
                     summary: `Pipeline closed — ${state.feature ?? 'feature'} complete`,
@@ -1058,6 +1233,9 @@ function startAutopilotWatcher(context: vscode.ExtensionContext): void {
                 type: 'task-completed',
                 timestamp: new Date().toISOString(),
                 source: 'autopilot-watcher',
+                severity: 'success',
+                title: `Autopilot routed to @${targetAgent}`,
+                detail: `Stage ${stage}`,
                 stage,
                 agent: targetAgent,
                 summary: `Routed to @${targetAgent} for stage: ${stage}`,
@@ -1123,12 +1301,126 @@ async function cmdProbeAutopilot(): Promise<void> {
 }
 
 // ─────────────────────────────────────────────────────────────
+// junai.deepPlan — run deep planning mode (experimental)
+// ─────────────────────────────────────────────────────────────
+async function cmdDeepPlan() {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        vscode.window.showErrorMessage('junai: No workspace folder open.');
+        return;
+    }
+
+    try {
+        requireFeature('deepPlan');
+    } catch {
+        return;
+    }
+
+    const taskSummary = await vscode.window.showInputBox({
+        prompt: 'What complex task should Deep Plan break down?',
+        placeHolder: 'e.g. add staged rollout for Dream memory with rollback safety and metrics',
+        ignoreFocusOut: true,
+    });
+    if (!taskSummary) { return; }
+
+    const scopeInput = await vscode.window.showInputBox({
+        prompt: 'Scope (optional, comma/newline separated)',
+        placeHolder: 'e.g. src/dreamMemory.ts, src/extension.ts, package.json settings',
+        ignoreFocusOut: true,
+    });
+
+    const constraintsInput = await vscode.window.showInputBox({
+        prompt: 'Constraints (optional, comma/newline separated)',
+        placeHolder: 'e.g. no pipeline-state edits, backward compatible, no new dependencies',
+        ignoreFocusOut: true,
+    });
+
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+    const activeEditorPath = vscode.window.activeTextEditor?.document.uri.fsPath;
+    const contextReferences = activeEditorPath
+        ? [path.relative(workspaceRoot, activeEditorPath)]
+        : [];
+
+    const request = buildDeepPlanRequest({
+        taskSummary,
+        scopeInput,
+        constraintsInput,
+        contextReferences,
+    });
+    const result = createDeepPlanResult(request);
+    const markdown = renderDeepPlanMarkdown(request, result);
+    const outputPath = persistDeepPlanMarkdown(workspaceRoot, markdown);
+
+    const channel = vscode.window.createOutputChannel('junai Deep Plan');
+    channel.show(true);
+    channel.appendLine('=== junai Deep Plan ===');
+    channel.appendLine(`Saved: ${outputPath}`);
+    channel.appendLine('');
+    channel.appendLine(markdown);
+
+    const eventBus = JunaiEventBus.getInstance();
+    eventBus.emit({
+        type: 'approval-needed',
+        timestamp: new Date().toISOString(),
+        source: 'deep-plan',
+        severity: 'info',
+        title: 'Deep Plan ready',
+        detail: `Confidence ${result.confidence}. Review plan and choose your next step.`,
+        stage: 'plan',
+        agent: 'Deep Plan',
+        action: 'use_deep_plan',
+        riskTier: 'medium',
+    });
+
+    const action = await vscode.window.showInformationMessage(
+        `junai deep plan ready (${result.confidence} confidence). Choose your next step.`,
+        'Use This Plan',
+        'Copy Next Step',
+        'Open Plan File',
+    );
+
+    if (action === 'Use This Plan') {
+        await vscode.env.clipboard.writeText(result.nextAction);
+        eventBus.emit({
+            type: 'task-completed',
+            timestamp: new Date().toISOString(),
+            source: 'deep-plan',
+            severity: 'success',
+            title: 'Deep Plan selected',
+            detail: 'Next step copied to clipboard',
+            stage: 'plan-approved',
+            agent: 'Deep Plan',
+            summary: 'User selected deep plan and copied the next step to clipboard',
+        });
+        vscode.window.showInformationMessage('junai deep plan selected. Next step copied to clipboard.');
+        return;
+    }
+
+    if (action === 'Copy Next Step') {
+        await vscode.env.clipboard.writeText(result.nextAction);
+        vscode.window.showInformationMessage('junai deep plan next step copied to clipboard.');
+        return;
+    }
+
+    if (action === 'Open Plan File') {
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(outputPath));
+        await vscode.window.showTextDocument(doc, { preview: false });
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
 // junai.coordinate — run coordinator mode (experimental)
 // ─────────────────────────────────────────────────────────────
 async function cmdCoordinate() {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
         vscode.window.showErrorMessage('junai: No workspace folder open.');
+        return;
+    }
+
+    try {
+        requireFeature('coordinator');
+    } catch {
         return;
     }
 
@@ -1189,6 +1481,31 @@ async function cmdCoordinate() {
         channel.appendLine(`Summary: ${result.summary.completed} completed / ${result.summary.failed} failed / ${result.summary.total} total`);
         channel.appendLine('');
         channel.appendLine(result.synthesizedOutput);
+
+        if (dreamMemoryService) {
+            const dreamResult = dreamMemoryService.recordCoordinatorRun({
+                goal,
+                summary: result.summary,
+                workerResults: result.workerResults.map((workerResult) => ({
+                    workerId: workerResult.workerId,
+                    workerType: workerResult.workerType,
+                    label: workerResult.label,
+                    status: workerResult.status,
+                    output: workerResult.output,
+                    error: workerResult.error,
+                })),
+            });
+
+            if (dreamResult) {
+                const promotedCount = dreamResult.factsAdded.length + dreamResult.factsUpdated.length;
+                if (promotedCount > 0 || dreamResult.factsPruned.length > 0) {
+                    channel.appendLine('');
+                    channel.appendLine(
+                        `Dream consolidation: +${dreamResult.factsAdded.length} added / ${dreamResult.factsUpdated.length} updated / ${dreamResult.factsPruned.length} pruned`
+                    );
+                }
+            }
+        }
 
         vscode.window.showInformationMessage(
             `junai coordinator: completed ${result.summary.total} workers in ${result.totalDurationMs}ms.`,
