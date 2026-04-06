@@ -4,6 +4,32 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [0.9.0] — 2026-04-06
+
+### New Features
+
+- **Coordinator Mode (experimental)** — `junai: Run Coordinator Mode` launches a parallel execution engine that breaks work into a task graph, assigns tasks to specialist worker agents, and synthesises results. Handles dependency ordering, parallel tracks, and structured output aggregation.
+- **Feature flag infrastructure** — Internal feature flag system gates experimental capabilities. Flags read from `project-config.md` and VS Code settings. Coordinator and deep-plan are behind flags by default.
+- **Risk-tiered permission system** — Actions classified into low/medium/high risk tiers. High-risk operations (destructive git, force push, prod deploys) require explicit user confirmation regardless of pipeline mode.
+- **Typed event bus** — Internal event bus with rolling log powers autopilot watcher and coordinator mode. All pipeline stage transitions, gate changes, and agent completions now emit typed events.
+
+### Pool Updates
+
+- **Instructions** — `advisory-mode.instructions.md` and `validation-discipline.instructions.md` updated with refined guidance.
+- **Diagrams** — `.drawio` source files now tracked in git (`project-onboarding-flow.drawio`, `recipe-system-architecture.drawio`). Diagrams remain excluded from the VSIX via `.vscodeignore`.
+- **junai-landscape.md** — Updated to reflect current system state.
+
+---
+
+## [0.8.3] — 2026-04-05
+
+### Improvements
+
+- **Dark mode ink token WCAG AA fix** — `--ink-3` lifted from `#9C9890` to `#A8A49C`, `--ink-4` from `#706C64` to `#8A8680`. Both now pass 4.6:1 contrast on dark card surfaces (`#242320`).
+- **onboarding diagram corrections** — `project-onboarding-flow.drawio` updated to correctly separate Pipeline and Recipe concepts. All "Initialize with Recipe" labels corrected to "Initialize Agent Pipeline". Recipe documented as a sub-step, not a separate command.
+
+---
+
 ## [0.8.2] — 2026-04-04
 
 ### New Features
