@@ -36,8 +36,28 @@ type RuntimeInstallSummary = {
     skipped: RuntimeBundleTarget[];
 };
 
+type CleanupRuntimeName = Extract<RuntimeName, 'claude' | 'codex'>;
+
+type DuplicateRuntimeTarget = {
+    runtimeName: CleanupRuntimeName;
+    workspaceRoot: string;
+    workspaceSignalPath: string;
+    userSignalPath: string;
+};
+
+type DuplicateRuntimeCleanupSummary = {
+    archived: DuplicateRuntimeTarget[];
+    skipped: Array<{ target: DuplicateRuntimeTarget; reason: string }>;
+    backupRoot?: string;
+};
+
 let dreamMemoryService: DreamMemoryService | null = null;
 let proactiveAssistantService: ProactiveAssistantService | null = null;
+
+const ALLOWED_WORKSPACE_RUNTIME_ENTRIES: Record<CleanupRuntimeName, Set<string>> = {
+    claude: new Set(['agents', 'skills', 'rules']),
+    codex: new Set(['skills']),
+};
 
 function getRuntimeDirName(runtimeName: RuntimeName): string {
     switch (runtimeName) {
@@ -103,7 +123,179 @@ function formatRuntimeSkipNotice(skippedTargets: RuntimeBundleTarget[]): string 
         .map(workspacePath => `\`${path.basename(workspacePath)}\``)
         .join(', ');
 
-    return `Skipped workspace runtime deployment for ${runtimeList} because matching user-level runtimes were detected. Set \`junai.avoidUserLevelRuntimeDuplication\` to \`false\` to force workspace deployment.`;
+    return `Skipped workspace runtime deployment for ${runtimeList} because matching user-level runtimes were detected. Run \`junai: Clean Up Duplicate Workspace Runtimes\` to archive existing workspace duplicates. Set \`junai.avoidUserLevelRuntimeDuplication\` to \`false\` to force workspace deployment.`;
+}
+
+function getRuntimeSignalPath(runtimeName: CleanupRuntimeName, runtimeRoot: string): string {
+    const signalDir = runtimeName === 'claude' ? 'agents' : 'skills';
+    return path.join(runtimeRoot, signalDir);
+}
+
+function getUserRuntimeSignalPath(runtimeName: CleanupRuntimeName): string {
+    const runtimeRoot = path.join(os.homedir(), getRuntimeDirName(runtimeName));
+    return getRuntimeSignalPath(runtimeName, runtimeRoot);
+}
+
+function getDuplicateWorkspaceRuntimeTargets(targetFolder: string): DuplicateRuntimeTarget[] {
+    if (!shouldAvoidUserLevelRuntimeDuplication()) { return []; }
+
+    const runtimeNames: CleanupRuntimeName[] = ['claude', 'codex'];
+    const targets: DuplicateRuntimeTarget[] = [];
+
+    for (const runtimeName of runtimeNames) {
+        const workspaceRoot = path.join(targetFolder, getRuntimeDirName(runtimeName));
+        const workspaceSignalPath = getRuntimeSignalPath(runtimeName, workspaceRoot);
+        const userSignalPath = getUserRuntimeSignalPath(runtimeName);
+        if (!fs.existsSync(workspaceSignalPath)) { continue; }
+        if (!fs.existsSync(userSignalPath)) { continue; }
+        targets.push({ runtimeName, workspaceRoot, workspaceSignalPath, userSignalPath });
+    }
+
+    return targets;
+}
+
+function listUnsafeWorkspaceRuntimeEntries(target: DuplicateRuntimeTarget): string[] {
+    if (!fs.existsSync(target.workspaceRoot)) { return []; }
+    const allowedEntries = ALLOWED_WORKSPACE_RUNTIME_ENTRIES[target.runtimeName];
+
+    return fs.readdirSync(target.workspaceRoot, { withFileTypes: true })
+        .map(entry => entry.name)
+        .filter(name => !SKIP.has(name))
+        .filter(name => !allowedEntries.has(name));
+}
+
+function cleanupDuplicateWorkspaceRuntimes(targetFolder: string): DuplicateRuntimeCleanupSummary {
+    const summary: DuplicateRuntimeCleanupSummary = { archived: [], skipped: [] };
+    const targets = getDuplicateWorkspaceRuntimeTargets(targetFolder);
+    if (targets.length === 0) { return summary; }
+
+    let backupRoot: string | undefined;
+
+    for (const target of targets) {
+        const unsafeEntries = listUnsafeWorkspaceRuntimeEntries(target);
+        if (unsafeEntries.length > 0) {
+            summary.skipped.push({
+                target,
+                reason: `contains non-junai entries (${unsafeEntries.join(', ')})`,
+            });
+            continue;
+        }
+
+        try {
+            if (!backupRoot) {
+                const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+                backupRoot = path.join(targetFolder, '.junai-backups', `duplicate-runtime-cleanup-${stamp}`);
+                fs.mkdirSync(backupRoot, { recursive: true });
+            }
+
+            const backupDest = path.join(backupRoot, path.basename(target.workspaceRoot));
+            if (fs.existsSync(backupDest)) {
+                summary.skipped.push({
+                    target,
+                    reason: `backup destination already exists (${backupDest})`,
+                });
+                continue;
+            }
+
+            fs.renameSync(target.workspaceRoot, backupDest);
+            summary.archived.push(target);
+        } catch (err: unknown) {
+            const reason = err instanceof Error ? err.message : String(err);
+            summary.skipped.push({ target, reason });
+        }
+    }
+
+    summary.backupRoot = backupRoot;
+    return summary;
+}
+
+function formatRuntimeTargetNames(targets: DuplicateRuntimeTarget[]): string {
+    return targets
+        .map(target => `\`${path.basename(target.workspaceRoot)}\``)
+        .join(', ');
+}
+
+async function cmdCleanupDuplicateRuntimes(
+    context?: vscode.ExtensionContext,
+    targetFolderOverride?: string,
+): Promise<void> {
+    const targetFolder = targetFolderOverride ?? await pickTargetFolder();
+    if (!targetFolder) { return; }
+
+    const duplicateTargets = getDuplicateWorkspaceRuntimeTargets(targetFolder);
+    if (duplicateTargets.length === 0) {
+        vscode.window.showInformationMessage('junai: No duplicate workspace runtimes detected.');
+        return;
+    }
+
+    const runtimeList = formatRuntimeTargetNames(duplicateTargets);
+    const confirm = await vscode.window.showWarningMessage(
+        `Archive duplicate workspace runtimes ${runtimeList}? This only archives junai-managed runtime folders and keeps a rollback copy in .junai-backups/.`,
+        { modal: true },
+        'Archive Duplicates',
+        'Cancel',
+    );
+    if (confirm !== 'Archive Duplicates') { return; }
+
+    const summary = cleanupDuplicateWorkspaceRuntimes(targetFolder);
+    const archivedList = summary.archived.length > 0 ? formatRuntimeTargetNames(summary.archived) : '';
+    const skippedDetail = summary.skipped
+        .map(item => `${path.basename(item.target.workspaceRoot)} (${item.reason})`)
+        .join('; ');
+
+    if (summary.archived.length > 0) {
+        let message = `junai: Archived duplicate workspace runtimes ${archivedList}.`;
+        if (summary.backupRoot) {
+            message += ` Backup: ${summary.backupRoot}.`;
+        }
+        if (summary.skipped.length > 0) {
+            message += ` Skipped: ${skippedDetail}.`;
+        }
+        vscode.window.showInformationMessage(message);
+    } else {
+        vscode.window.showWarningMessage(`junai: No runtime folders were archived. ${skippedDetail || 'Nothing matched cleanup safety checks.'}`);
+    }
+
+    if (context) {
+        const promptKey = `junai.duplicateRuntimeCleanupPrompted.${targetFolder}`;
+        await context.workspaceState.update(promptKey, true);
+    }
+}
+
+async function promptDuplicateRuntimeCleanupIfNeeded(context: vscode.ExtensionContext): Promise<void> {
+    if (!shouldAvoidUserLevelRuntimeDuplication()) { return; }
+
+    const promptEnabled = vscode.workspace
+        .getConfiguration('junai')
+        .get<boolean>('promptDuplicateRuntimeCleanup', true);
+    if (!promptEnabled) { return; }
+
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) { return; }
+
+    const targetFolder = workspaceFolders[0].uri.fsPath;
+    const duplicateTargets = getDuplicateWorkspaceRuntimeTargets(targetFolder);
+    if (duplicateTargets.length === 0) { return; }
+
+    const promptKey = `junai.duplicateRuntimeCleanupPrompted.${targetFolder}`;
+    if (context.workspaceState.get<boolean>(promptKey)) { return; }
+
+    const runtimeList = formatRuntimeTargetNames(duplicateTargets);
+    const choice = await vscode.window.showInformationMessage(
+        `junai detected duplicate workspace runtimes (${runtimeList}) while matching user-level runtimes exist. Archive workspace duplicates now to avoid duplicate agent listings?`,
+        'Archive Duplicates',
+        'Later',
+        'Never Ask Again',
+    );
+
+    if (choice === 'Archive Duplicates') {
+        await cmdCleanupDuplicateRuntimes(context, targetFolder);
+        return;
+    }
+
+    if (choice === 'Never Ask Again' || choice === 'Later') {
+        await context.workspaceState.update(promptKey, true);
+    }
 }
 
 function junaiManagedSection(): string {
@@ -211,6 +403,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('junai.status',          () => cmdStatus()),
         vscode.commands.registerCommand('junai.setMode',         () => cmdSetMode()),
         vscode.commands.registerCommand('junai.remove',          () => cmdRemove()),
+        vscode.commands.registerCommand('junai.cleanupDuplicateRuntimes', () => cmdCleanupDuplicateRuntimes(context)),
         vscode.commands.registerCommand('junai.update',          (opts?: { silent?: boolean }) => cmdUpdate(context, opts)),
         vscode.commands.registerCommand('junai.initPool',        () => cmdInitPool(context)),
         vscode.commands.registerCommand('junai.setRecipe',       () => cmdSetRecipe()),
@@ -259,6 +452,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Auto-update nudge — notify when workspace pool is behind the installed extension
     checkPoolUpdate(context);
+
+    // One-time prompt for legacy workspaces that still have duplicate .claude/.codex runtimes
+    void promptDuplicateRuntimeCleanupIfNeeded(context);
 }
 
 type ExperimentalCommandHandler = () => void | Promise<void>;
