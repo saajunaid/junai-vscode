@@ -1,13 +1,15 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { spawnSync } from 'child_process';
 import { getExperimentalFeatureManifest, getExperimentalFeatureStatus, isFeatureEnabled, requireFeature } from './featureFlags';
 import { getAllClassifications } from './permissions';
 import { JunaiEventBus } from './eventBus';
 import { coordinate, CoordinationRequest } from './coordinator';
 import { createDreamMemoryService, type DreamMemoryService, readDreamMemorySummary } from './dreamMemory';
-import { buildDeepPlanRequest, createDeepPlanResult, persistDeepPlanMarkdown, renderDeepPlanMarkdown } from './deepPlan';
+import { buildDeepPlanRequest, createDeepPlanResult, persistDeepPlanMarkdown, renderDeepPlanMarkdown, scanWorkspace } from './deepPlan';
+import { enrichPlanWithLM } from './lmEnrich';
 import { createProactiveAssistantService, type ProactiveAssistantService } from './proactiveAssistant';
 
 // ─────────────────────────────────────────────────────────────
@@ -19,8 +21,90 @@ const COPILOT_RUNTIME_DIR = '.github';
 const CLAUDE_RUNTIME_DIR = '.claude';
 const CODEX_RUNTIME_DIR = '.codex';
 
+type RuntimeName = 'copilot' | 'claude' | 'codex';
+
+type RuntimeBundleTarget = {
+    runtimeName: RuntimeName;
+    poolRoot: string;
+    workspaceRoot: string;
+    deploy: boolean;
+    skipReason?: string;
+};
+
+type RuntimeInstallSummary = {
+    installed: RuntimeName[];
+    skipped: RuntimeBundleTarget[];
+};
+
 let dreamMemoryService: DreamMemoryService | null = null;
 let proactiveAssistantService: ProactiveAssistantService | null = null;
+
+function getRuntimeDirName(runtimeName: RuntimeName): string {
+    switch (runtimeName) {
+        case 'copilot': return COPILOT_RUNTIME_DIR;
+        case 'claude':  return CLAUDE_RUNTIME_DIR;
+        case 'codex':   return CODEX_RUNTIME_DIR;
+    }
+}
+
+function hasUserLevelRuntimeTarget(runtimeName: RuntimeName): boolean {
+    const home = os.homedir();
+    switch (runtimeName) {
+        case 'copilot':
+            return false;
+        case 'claude':
+            return fs.existsSync(path.join(home, CLAUDE_RUNTIME_DIR, 'agents'));
+        case 'codex':
+            return fs.existsSync(path.join(home, CODEX_RUNTIME_DIR, 'skills'));
+    }
+}
+
+function shouldAvoidUserLevelRuntimeDuplication(): boolean {
+    return vscode.workspace.getConfiguration('junai').get<boolean>('avoidUserLevelRuntimeDuplication', true);
+}
+
+function buildRuntimeBundleTargets(poolDir: string, targetFolder: string): RuntimeBundleTarget[] {
+    const avoidDuplication = shouldAvoidUserLevelRuntimeDuplication();
+
+    const makeTarget = (runtimeName: RuntimeName): RuntimeBundleTarget => {
+        const runtimeDir = getRuntimeDirName(runtimeName);
+        const workspaceRoot = path.join(targetFolder, runtimeDir);
+        const poolRoot = path.join(poolDir, runtimeDir);
+
+        if (runtimeName === 'copilot') {
+            return { runtimeName, poolRoot, workspaceRoot, deploy: true };
+        }
+
+        const hasUserLevelRuntime = hasUserLevelRuntimeTarget(runtimeName);
+        const deploy = !(avoidDuplication && hasUserLevelRuntime);
+        return {
+            runtimeName,
+            poolRoot,
+            workspaceRoot,
+            deploy,
+            skipReason: deploy
+                ? undefined
+                : `matching user-level ${runtimeDir} runtime detected`,
+        };
+    };
+
+    return [
+        makeTarget('copilot'),
+        makeTarget('claude'),
+        makeTarget('codex'),
+    ];
+}
+
+function formatRuntimeSkipNotice(skippedTargets: RuntimeBundleTarget[]): string {
+    if (skippedTargets.length === 0) { return ''; }
+
+    const runtimeList = skippedTargets
+        .map(target => target.workspaceRoot)
+        .map(workspacePath => `\`${path.basename(workspacePath)}\``)
+        .join(', ');
+
+    return `Skipped workspace runtime deployment for ${runtimeList} because matching user-level runtimes were detected. Set \`junai.avoidUserLevelRuntimeDuplication\` to \`false\` to force workspace deployment.`;
+}
 
 function junaiManagedSection(): string {
     return [
@@ -284,15 +368,15 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
     const cfg  = vscode.workspace.getConfiguration('junai');
     const mode = cfg.get<string>('defaultMode', 'supervised');
 
-    await vscode.window.withProgress(
+    const runtimeSummary = await vscode.window.withProgress<RuntimeInstallSummary>(
         {
             location: vscode.ProgressLocation.Notification,
             title: 'junai',
             cancellable: false,
         },
-        async (progress) => {
+        async (progress): Promise<RuntimeInstallSummary> => {
             progress.report({ message: 'Copying agent pool…' });
-            installRuntimeBundles(poolDir, targetFolder);
+            const summary = installRuntimeBundles(poolDir, targetFolder);
 
             progress.report({ message: 'Setting up copilot-instructions.md…' });
             ensureCopilotInstructionsSection(githubDir);
@@ -306,18 +390,23 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
 
             writeWorkspacePoolVersion(context, githubDir);
             progress.report({ message: 'Done.' });
+
+            return summary;
         }
     );
+
+    const runtimeSkipNotice = formatRuntimeSkipNotice(runtimeSummary.skipped);
 
     await promptProfileSelectionAfterInit(context, targetFolder);
 
     if (silent) {
-        vscode.window.showInformationMessage(`✅ junai agent pipeline auto-initialized (mode: ${mode}).`);
+        const autoMsg = `✅ junai agent pipeline auto-initialized (mode: ${mode}).`;
+        vscode.window.showInformationMessage(runtimeSkipNotice ? `${autoMsg} ${runtimeSkipNotice}` : autoMsg);
         return;
     }
 
     const open = await vscode.window.showInformationMessage(
-        `✅ junai agent pipeline installed (mode: ${mode}). MCP server configured in .vscode/mcp.json. Open ARTIFACTS.md to get started.`,
+        `✅ junai agent pipeline installed (mode: ${mode}). MCP server configured in .vscode/mcp.json. Open ARTIFACTS.md to get started.${runtimeSkipNotice ? ` ${runtimeSkipNotice}` : ''}`,
         'Open ARTIFACTS.md', 'Dismiss'
     );
     if (open === 'Open ARTIFACTS.md') {
@@ -767,6 +856,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
 
     let updated = 0;
     let skipped = 0;
+    let runtimeSkipNotice = '';
     const git: { result: GitCommitResult } = { result: 'skipped-no-repo' };
 
     await vscode.window.withProgress(
@@ -774,32 +864,37 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
         async (progress) => {
             progress.report({ message: 'Updating agent pool…' });
 
-            const runtimes: RuntimeBundleSpec[] = [
-                {
-                    poolRoot: path.join(poolDir, COPILOT_RUNTIME_DIR),
-                    workspaceRoot: githubDir,
+            const runtimeTemplates: Record<RuntimeName, Omit<RuntimeBundleSpec, 'poolRoot' | 'workspaceRoot'>> = {
+                copilot: {
                     cleanDirs: ['agents', 'skills', 'prompts', 'instructions', 'tools', 'diagrams'],
                     mergeDirs: ['agent-docs', 'plans', 'handoffs'],
                     rootFiles: ['project-config.md'],
                     userOwnedFiles: USER_OWNED,
                 },
-                {
-                    poolRoot: path.join(poolDir, CLAUDE_RUNTIME_DIR),
-                    workspaceRoot: claudeDir,
-                    cleanDirs: ['agents', 'skills', 'rules'],
+                claude: {
+                    cleanDirs: ['skills', 'rules'],
                     mergeDirs: [],
                     rootFiles: [],
                     userOwnedFiles: new Set(),
                 },
-                {
-                    poolRoot: path.join(poolDir, CODEX_RUNTIME_DIR),
-                    workspaceRoot: codexDir,
+                codex: {
                     cleanDirs: ['skills'],
                     mergeDirs: [],
                     rootFiles: [],
                     userOwnedFiles: new Set(),
                 },
-            ];
+            };
+
+            const runtimeTargets = buildRuntimeBundleTargets(poolDir, workspaceFolders[0].uri.fsPath);
+            runtimeSkipNotice = formatRuntimeSkipNotice(runtimeTargets.filter(target => !target.deploy));
+
+            const runtimes: RuntimeBundleSpec[] = runtimeTargets
+                .filter(target => target.deploy)
+                .map(target => ({
+                    poolRoot: target.poolRoot,
+                    workspaceRoot: target.workspaceRoot,
+                    ...runtimeTemplates[target.runtimeName],
+                }));
 
             for (const runtime of runtimes) {
                 const counts = updateRuntimeBundle(runtime);
@@ -827,6 +922,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     else if (git.result === 'skipped-in-progress') { msg += ' (git commit skipped — repo has an in-progress operation; commit manually)'; }
     else if (git.result === 'skipped-detached')    { msg += ' (git commit skipped — detached HEAD)'; }
     else if (git.result === 'error')               { msg += ' (git commit failed — commit manually if needed)'; }
+    if (runtimeSkipNotice)                         { msg += ` ${runtimeSkipNotice}`; }
     vscode.window.showInformationMessage(msg);
 }
 
@@ -849,19 +945,23 @@ async function cmdInitPool(context: vscode.ExtensionContext): Promise<void> {
     const githubDir = path.join(targetFolder, '.github');
     const poolDir   = path.join(context.extensionPath, 'pool');
 
-    await vscode.window.withProgress(
+    const runtimeSummary = await vscode.window.withProgress<RuntimeInstallSummary>(
         { location: vscode.ProgressLocation.Notification, title: 'junai: Deploying agent pool…', cancellable: false },
-        async () => {
-            installRuntimeBundles(poolDir, targetFolder);
+        async (): Promise<RuntimeInstallSummary> => {
+            const summary = installRuntimeBundles(poolDir, targetFolder);
             ensureCopilotInstructionsSection(githubDir);
             scaffoldMcpConfig(targetFolder);
             scaffoldVscodeSettings(targetFolder);
             writeWorkspacePoolVersion(context, githubDir);
+
+            return summary;
         }
     );
 
+    const runtimeSkipNotice = formatRuntimeSkipNotice(runtimeSummary.skipped);
+
     const sel = await vscode.window.showInformationMessage(
-        'junai: Agent pool deployed. Agents and skills are ready — no pipeline-state.json created.',
+        `junai: Agent pool deployed. Agents and skills are ready — no pipeline-state.json created.${runtimeSkipNotice ? ` ${runtimeSkipNotice}` : ''}`,
         'Select Profile', 'Set Recipe'
     );
     if (sel === 'Select Profile') { vscode.commands.executeCommand('junai.selectProfile'); }
@@ -938,17 +1038,21 @@ type RuntimeBundleSpec = {
     userOwnedFiles: Set<string>;
 };
 
-function installRuntimeBundles(poolDir: string, targetFolder: string): void {
-    const runtimes = [
-        { poolRoot: path.join(poolDir, COPILOT_RUNTIME_DIR), workspaceRoot: path.join(targetFolder, COPILOT_RUNTIME_DIR) },
-        { poolRoot: path.join(poolDir, CLAUDE_RUNTIME_DIR), workspaceRoot: path.join(targetFolder, CLAUDE_RUNTIME_DIR) },
-        { poolRoot: path.join(poolDir, CODEX_RUNTIME_DIR), workspaceRoot: path.join(targetFolder, CODEX_RUNTIME_DIR) },
-    ];
+function installRuntimeBundles(poolDir: string, targetFolder: string): RuntimeInstallSummary {
+    const summary: RuntimeInstallSummary = { installed: [], skipped: [] };
+    const runtimes = buildRuntimeBundleTargets(poolDir, targetFolder);
 
     for (const runtime of runtimes) {
+        if (!runtime.deploy) {
+            summary.skipped.push(runtime);
+            continue;
+        }
         if (!fs.existsSync(runtime.poolRoot)) { continue; }
         copyDirSync(runtime.poolRoot, runtime.workspaceRoot);
+        summary.installed.push(runtime.runtimeName);
     }
+
+    return summary;
 }
 
 function updateRuntimeBundle(spec: RuntimeBundleSpec): { updated: number; skipped: number } {
@@ -1341,14 +1445,24 @@ async function cmdDeepPlan() {
         ? [path.relative(workspaceRoot, activeEditorPath)]
         : [];
 
+    // Scan workspace for codebase context
+    const scan = scanWorkspace(workspaceRoot);
+
     const request = buildDeepPlanRequest({
         taskSummary,
         scopeInput,
         constraintsInput,
         contextReferences,
     });
-    const result = createDeepPlanResult(request);
-    const markdown = renderDeepPlanMarkdown(request, result);
+    const result = createDeepPlanResult(request, scan);
+    let markdown = renderDeepPlanMarkdown(request, result, scan);
+
+    // Try LM enrichment — uses whatever model the user already has via vscode.lm
+    const enriched = await enrichPlanWithLM(request, result, scan, markdown);
+    if (enriched) {
+        markdown = enriched;
+    }
+
     const outputPath = persistDeepPlanMarkdown(workspaceRoot, markdown);
 
     const channel = vscode.window.createOutputChannel('junai Deep Plan');
