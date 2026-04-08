@@ -4,24 +4,115 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
-## [0.7.3] � 2026-03-31
+## [0.9.1] — 2026-04-06
+
+### New Commands
+
+- **`junai: Initialize Agent Pool`** — deploys the full agent pool (`.github/`, `.claude/`, `.codex/`) without creating `pipeline-state.json`. For teams that want standalone agents and skills without pipeline orchestration. Prompts for profile and recipe after deploy.
+- **`junai: Set Recipe`** — standalone recipe picker. Scans `.github/recipes/*.recipe.md` and lets you set or change the recipe in `project-config.md` at any time, not just during initialization. Shows the currently selected recipe in the placeholder so it's clear what's already configured.
+
+---
+
+## [0.9.0] — 2026-04-06
 
 ### New Features
 
-- **Preflight agent** � New `preflight` specialist validates implementation plans against the actual codebase (API endpoints, type names, field names, dependencies, file paths, data shapes, transforms) before any coding begins. Routes to Planner on FAIL or directly to Implement on PASS. Supports standalone mode and full pipeline integration.
-- **skill-creator skill** � New `workflow/skill-creator` skill with a full evaluation framework: analyzer, comparator, and grader sub-agents; benchmark scripts; eval-viewer HTML report; and packaging utilities for authoring new skills from scratch.
-- **webapp-testing skill** � New `testing/webapp-testing` skill with Playwright-based automation patterns, element discovery, static HTML automation, and server-integrated test examples.
-- **high-end-visual-design skill** � New `frontend/high-end-visual-design` skill for premium visual UI work.
-- **windows-deployment skill** � New `devops/windows-deployment` skill for Windows-specific deployment patterns.
-- **New skill reference files** � Added `css-architecture/RESPONSIVE-DESIGN.md`, `design-system-tokens/DESIGN-SYSTEM-TEMPLATE.md`, `frontend/premium-react/MOTION-SPEC.md`, and `frontend/ux-design/ACCESSIBILITY.md` reference documents to existing skill categories.
+- **Coordinator Mode (experimental)** — `junai: Run Coordinator Mode` launches a parallel execution engine that breaks work into a task graph, assigns tasks to specialist worker agents, and synthesises results. Handles dependency ordering, parallel tracks, and structured output aggregation.
+- **Feature flag infrastructure** — Internal feature flag system gates experimental capabilities. Flags read from `project-config.md` and VS Code settings. Coordinator and deep-plan are behind flags by default.
+- **Risk-tiered permission system** — Actions classified into low/medium/high risk tiers. High-risk operations (destructive git, force push, prod deploys) require explicit user confirmation regardless of pipeline mode.
+- **Typed event bus** — Internal event bus with rolling log powers autopilot watcher and coordinator mode. All pipeline stage transitions, gate changes, and agent completions now emit typed events.
+
+### Pool Updates
+
+- **Instructions** — `advisory-mode.instructions.md` and `validation-discipline.instructions.md` updated with refined guidance.
+- **Diagrams** — `.drawio` source files now tracked in git (`project-onboarding-flow.drawio`, `recipe-system-architecture.drawio`). Diagrams remain excluded from the VSIX via `.vscodeignore`.
+- **junai-landscape.md** — Updated to reflect current system state.
+
+---
+
+## [0.8.3] — 2026-04-05
 
 ### Improvements
 
-- **UX Designer agent overhauled** � Merged the `ui-ux-designer` agent into `ux-designer`. The unified agent covers both generative design (JTBD, wireframes, specs) and evidence-based critique with NN Group citations. `ui-ux-designer.agent.md` removed.
-- **17 agents updated** � `accessibility`, `anchor`, `architect`, `code-reviewer`, `data-engineer`, `debug`, `frontend-developer`, `implement`, `janitor`, `mentor`, `orchestrator`, `planner`, `prd`, `prompt-engineer`, `sql-expert`, `streamlit-developer`, `tester` � all received refinements to protocols, routing logic, and output contracts.
-- **Orchestrator & Planner enhanced** � Improved handoff payload handling, intent verification, and multi-phase routing for assisted/autopilot modes.
-- **large-task-fidelity instructions updated** � Added Output Decay self-sweep rule with mechanically-detectable decay signal patterns.
-- **Pipeline tooling** � `agents.registry.json` updated with Preflight entry; `schema.py` and `pipeline-state.template.json` updated; pipeline flowchart refreshed.
+- **Dark mode ink token WCAG AA fix** — `--ink-3` lifted from `#9C9890` to `#A8A49C`, `--ink-4` from `#706C64` to `#8A8680`. Both now pass 4.6:1 contrast on dark card surfaces (`#242320`).
+- **onboarding diagram corrections** — `project-onboarding-flow.drawio` updated to correctly separate Pipeline and Recipe concepts. All "Initialize with Recipe" labels corrected to "Initialize Agent Pipeline". Recipe documented as a sub-step, not a separate command.
+
+---
+
+## [0.8.2] — 2026-04-04
+
+### New Features
+
+- **Data-contract-pipeline DB discovery** — `extract_schema.py` now supports full database discovery: `--discover` enumerates all tables/views with columns, primary keys, and foreign key relationships. `--sample N` fetches rows for type inference and detects embedded structured data (JSON, XML, YAML, markdown, pipe-delimited) inside string columns. `--schema` targets specific DB schemas (dbo, public, etc.).
+- **Multi-DB type coverage** — SQL type map expanded from SQL Server-only to include PostgreSQL (JSONB, UUID, ARRAY, TIMESTAMPTZ, BOOLEAN, SERIAL, BYTEA, CITEXT, INET), MySQL (ENUM, SET, MEDIUMTEXT, LONGBLOB), and SQLite types.
+- **FK-based DTO nesting** — Foreign key relationships extracted during discovery inform DTO nesting suggestions and multi-table join patterns.
+- **Natural-language DB intent** — Skill instructions updated so agents detect "data is in the database" naturally without requiring CLI flags from users.
+
+### Improvements
+
+- **SKILL.md Step 1.5 — DB Discovery** — New pipeline phase for database sources: discover → sample → embedded format detect → multi-table aggregate → relationship map. Feeds into existing Step 2+ pipeline unchanged.
+- **Drift check catalog** — Two new checks: D13 (embedded format in string column not extracted to typed model), D14 (FK relationship exists but DTO is flat).
+- **DB Discovery & Sampling docs** — Connection string examples for SQL Server, PostgreSQL, MySQL, SQLite added to Scripts section.
+
+---
+
+## [0.8.1] — 2026-04-04
+
+### New Features
+
+- **Recipe discovery in managed section** — Recipe-Driven Delivery instructions now embedded inside the `<!-- junai:start -->` sentinel markers in `copilot-instructions.md`. Every project gets recipe discovery automatically on extension install/update — no manual copy needed. Works with ALL AI tools (Copilot, Claude, Cursor, Windsurf, Codex).
+- **Recipe selection in profile flow** — After selecting a project profile, the extension now prompts for recipe selection via quick-pick. Scans `.github/recipes/` for available `.recipe.md` files. Writes the selected recipe to `project-config.md` automatically.
+- **PROJECT-ONBOARDING-RUNBOOK.md** — Comprehensive end-to-end onboarding guide covering the full process from `platform-infra` bootstrap through junai extension pool deployment to pipeline kickoff. Includes all commands, parameters, and troubleshooting.
+- **`validation-discipline.instructions.md` promoted to pool** — Previously only in project-template, now available to all projects via pool deployment.
+
+### Improvements
+
+- **RECIPE-RUNBOOK.md updated** — Fresh project scenario now documents the correct flow (platform-infra bootstrap → extension pool deploy → profile/recipe selection). Standalone mode section updated to explain managed-section deployment mechanism.
+- **project-template cleanup** — Removed stale `.github/instructions/` folder (was 14 files behind pool's 26, with 1 outdated). Instructions now deployed exclusively by the extension pool, eliminating version drift.
+
+---
+
+## [0.8.0] — 2026-04-03
+
+### New Features
+
+- **Cross-project recipe system** — New `recipes/` directory in the pool with composable delivery workflow manifests. Recipes are thin orchestration layers that compose existing skills into repeatable pipelines — eliminating manual skill invocation for standard project archetypes.
+  - **`enterprise-dashboard` recipe** — 9-phase delivery pipeline (data-intake → adapter → normalize → display-DTO → contract-test → API-surface → UI-design → implement → verify) with mandatory skill composition per phase, cross-skill conventions (DTO naming chain, directory structure, service layer patterns), visualization decision matrix (10 chart types → Recharts mappings), mockup-to-react contract (5 annotation types), and cross-cutting observability integration.
+  - **Universal recipe discovery** — `copilot-instructions.md` now includes a "Recipe-Driven Delivery" section that ALL AI tools read automatically (Copilot, Claude Code, Cursor, Windsurf, Codex). Recipe discovery works in standalone mode — no pipeline dependency required. Follows the Netflix "Paved Roads" principle: you don't need a special map to find the road.
+  - **3-source skill loading** — Agents now compose skills from three sources (handoff payload + mandatory triggers + recipe), taking the union of all three. Additive, never destructive.
+  - **Recipe-aware agents** — Planner (uses recipe's Delivery Pipeline as phase scaffold), Orchestrator (appends recipe skills to handoff payload), Frontend Developer and Implement (independently discover and load recipe skills for their phases).
+  - **RECIPE-RUNBOOK.md** — Comprehensive documentation covering 4 onboarding scenarios (fresh project, existing project mid-flight, no-recipe, creating a new recipe), standalone mode explanation, and FAQ.
+  - **recipe-system-architecture.drawio** — 5-layer architecture diagram (source of truth → project bootstrap → agent skill loading → recipe content → delivery pipeline).
+
+### Improvements
+
+- **`react-fastapi-vite-mssql` profile enriched** — Stack Details expanded from 10 to 23 rows (added React 19, Vite 6+, Tailwind 3.4+, Recharts 3+, React-Leaflet, Framer Motion 12+, react-hook-form + zod, uv, ruff, Vitest, Playwright, DM Sans, JetBrains Mono, Warm Editorial design system). Key Conventions expanded from 5 to 11 rows.
+- **Planner agent enhanced** — Added iterative Planning Workflow (Discovery → Alignment → Design → Refinement cycle), recipe-aware mandatory trigger, and Section 6.2 Recipe-Aware Planning (7 rules for recipe consumption including phase scaffolding, skill embedding, and convention enforcement).
+- **onboard-project skill updated** — Now asks about recipe selection during project setup (optional, not a gate).
+- **sync.ps1 updated** — `recipes` added to `$POOL_FOLDERS`, `$CLEAN_FOLDERS`, and `junai-push` git staging.
+- **Runtime export tooling** — `export_runtime_resources.py` and `runtime-targets.json` added for building runtime-specific project resources.
+- **Root cleanup** — Removed scratch files (`nul`, `test_pil.py`, `process_icon.py`, `Personas for Prompt`). Added `.gitignore` exclusions for local-only docs.
+
+---
+
+## [0.7.3] — 2026-03-31
+
+### New Features
+
+- **Preflight agent** � New `preflight` specialist validates implementation plans against the actual codebase (API endpoints, type names, field names, dependencies, file paths, data shapes, transforms) before any coding begins. Routes to Planner on FAIL or directly to Implement on PASS. Supports standalone mode and full pipeline integration.
+- **skill-creator skill** � New `workflow/skill-creator` skill with a full evaluation framework: analyzer, comparator, and grader sub-agents; benchmark scripts; eval-viewer HTML report; and packaging utilities for authoring new skills from scratch.
+- **webapp-testing skill** � New `testing/webapp-testing` skill with Playwright-based automation patterns, element discovery, static HTML automation, and server-integrated test examples.
+- **high-end-visual-design skill** � New `frontend/high-end-visual-design` skill for premium visual UI work.
+- **windows-deployment skill** � New `devops/windows-deployment` skill for Windows-specific deployment patterns.
+- **New skill reference files** � Added `css-architecture/RESPONSIVE-DESIGN.md`, `design-system-tokens/DESIGN-SYSTEM-TEMPLATE.md`, `frontend/premium-react/MOTION-SPEC.md`, and `frontend/ux-design/ACCESSIBILITY.md` reference documents to existing skill categories.
+
+### Improvements
+
+- **UX Designer agent overhauled** � Merged the `ui-ux-designer` agent into `ux-designer`. The unified agent covers both generative design (JTBD, wireframes, specs) and evidence-based critique with NN Group citations. `ui-ux-designer.agent.md` removed.
+- **17 agents updated** � `accessibility`, `anchor`, `architect`, `code-reviewer`, `data-engineer`, `debug`, `frontend-developer`, `implement`, `janitor`, `mentor`, `orchestrator`, `planner`, `prd`, `prompt-engineer`, `sql-expert`, `streamlit-developer`, `tester` � all received refinements to protocols, routing logic, and output contracts.
+- **Orchestrator & Planner enhanced** � Improved handoff payload handling, intent verification, and multi-phase routing for assisted/autopilot modes.
+- **large-task-fidelity instructions updated** � Added Output Decay self-sweep rule with mechanically-detectable decay signal patterns.
+- **Pipeline tooling** � `agents.registry.json` updated with Preflight entry; `schema.py` and `pipeline-state.template.json` updated; pipeline flowchart refreshed.
 
 ---
 ## [0.7.0] — 2026-03-26

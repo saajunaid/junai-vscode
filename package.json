@@ -2,7 +2,7 @@
   "name": "junai",
   "displayName": "junai - AI Agent Pipeline",
   "description": "Agentic Engineering for GitHub Copilot. 25 specialist agents, 9 MCP tools, deterministic routing, 3 pipeline modes (supervised/assisted/autopilot), autopilot watcher, and safe managed-section copilot-instructions.md â€” your content is never overwritten. From idea to shipped.",
-  "version": "0.7.4",
+  "version": "0.9.3",
   "publisher": "junai-labs",
   "engines": {
     "vscode": "^1.101.0"
@@ -88,13 +88,38 @@
         "category": "junai"
       },
       {
+        "command": "junai.cleanupDuplicateRuntimes",
+        "title": "Clean Up Duplicate Workspace Runtimes",
+        "category": "junai"
+      },
+      {
         "command": "junai.update",
         "title": "Update Agent Pool",
         "category": "junai"
       },
       {
+        "command": "junai.initPool",
+        "title": "Initialize Agent Pool",
+        "category": "junai"
+      },
+      {
+        "command": "junai.setRecipe",
+        "title": "Set Recipe",
+        "category": "junai"
+      },
+      {
         "command": "junai.probeAutopilot",
         "title": "Probe Autopilot Chat Commands (dry run)",
+        "category": "junai"
+      },
+      {
+        "command": "junai.coordinate",
+        "title": "Run Coordinator Mode (experimental)",
+        "category": "junai"
+      },
+      {
+        "command": "junai.deepPlan",
+        "title": "Deep Plan: Build Structured Plan (experimental)",
         "category": "junai"
       }
     ],
@@ -125,6 +150,36 @@
           ],
           "default": "prompt",
           "description": "Controls automatic agent pipeline initialization when VS Code opens a workspace. prompt = offer with a notification; always = initialize silently on first open; never = suppress all activation prompts."
+        },
+        "junai.avoidUserLevelRuntimeDuplication": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, junai skips deploying workspace .claude/.codex runtime bundles if matching user-level runtimes are already present, preventing duplicate agent listings across user and workspace scopes."
+        },
+        "junai.promptDuplicateRuntimeCleanup": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, junai shows a one-time prompt to archive legacy workspace .claude/.codex runtime folders if matching user-level runtimes exist, preventing duplicate agent listings without deleting data."
+        },
+        "junai.experimental.coordinator": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Coordinator Mode — fan out tasks to parallel workers and synthesize results. Implemented experimental feature."
+        },
+        "junai.experimental.dream": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Dream Memory Consolidation — quiet, opt-in memory consolidation after significant work/events. Implemented experimental feature."
+        },
+        "junai.experimental.deepPlan": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Deep Plan Mode — structured planning lane for complex tasks with assumptions, risks, phased outline, and approval-ready next action. Implemented experimental feature."
+        },
+        "junai.experimental.proactive": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable KAIROS-lite Proactive Assistant — low-noise, opt-in notifications for meaningful runtime events with dedupe and cooldown. Implemented experimental feature."
         }
       }
     }
@@ -137,6 +192,9 @@
     "package": "npx vsce package --no-dependencies",
     "publish": "npx vsce publish --no-dependencies",
     "pretest": "npm run compile"
+  },
+  "dependencies": {
+    "fann-core": "file:../fann-core"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -1,0 +1,16 @@
+export {
+    ACTION_CLASSIFICATIONS,
+    DEFAULT_PROTECTED_PATH_PATTERNS,
+    PROTECTED_ACTIONS,
+    checkPermission,
+    getActionClassification,
+    getAllClassifications,
+    isProtectedAction,
+    isProtectedPath,
+    matchGlob,
+    type ActionClassification,
+    type ActionName,
+    type PermissionResult,
+    type ProtectedAction,
+    type RiskTier,
+} from 'fann-core';

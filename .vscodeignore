@@ -19,3 +19,6 @@ media/**
 # Local secret files — must NEVER be bundled into VSIX
 *.pat
 *.key
+
+# Diagrams — reference-only, not shipped with extension
+pool/.github/diagrams/**
