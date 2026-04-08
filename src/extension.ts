@@ -83,6 +83,20 @@ function shouldAvoidUserLevelRuntimeDuplication(): boolean {
     return vscode.workspace.getConfiguration('junai').get<boolean>('avoidUserLevelRuntimeDuplication', true);
 }
 
+function shouldAvoidClaudeRuleDuplication(): boolean {
+    return vscode.workspace.getConfiguration('junai').get<boolean>('avoidClaudeRuleDuplication', true);
+}
+
+function hasGithubInstructionSurface(poolDir: string, targetFolder: string): boolean {
+    const workspaceInstructions = path.join(targetFolder, COPILOT_RUNTIME_DIR, 'instructions');
+    const pooledInstructions = path.join(poolDir, COPILOT_RUNTIME_DIR, 'instructions');
+    return fs.existsSync(workspaceInstructions) || fs.existsSync(pooledInstructions);
+}
+
+function shouldSkipClaudeRulesDeployment(poolDir: string, targetFolder: string): boolean {
+    return shouldAvoidClaudeRuleDuplication() && hasGithubInstructionSurface(poolDir, targetFolder);
+}
+
 function buildRuntimeBundleTargets(poolDir: string, targetFolder: string): RuntimeBundleTarget[] {
     const avoidDuplication = shouldAvoidUserLevelRuntimeDuplication();
 
@@ -124,6 +138,11 @@ function formatRuntimeSkipNotice(skippedTargets: RuntimeBundleTarget[]): string 
         .join(', ');
 
     return `Skipped workspace runtime deployment for ${runtimeList} because matching user-level runtimes were detected. Run \`junai: Clean Up Duplicate Workspace Runtimes\` to archive existing workspace duplicates. Set \`junai.avoidUserLevelRuntimeDuplication\` to \`false\` to force workspace deployment.`;
+}
+
+function formatClaudeRulesSkipNotice(skipClaudeRules: boolean): string {
+    if (!skipClaudeRules) { return ''; }
+    return 'Skipped workspace `.claude/rules` deployment because `.github/instructions` is present, to avoid duplicate instruction surfaces. Set `junai.avoidClaudeRuleDuplication` to `false` to deploy Claude rules as well.';
 }
 
 function getRuntimeSignalPath(runtimeName: CleanupRuntimeName, runtimeRoot: string): string {
@@ -592,17 +611,20 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
     );
 
     const runtimeSkipNotice = formatRuntimeSkipNotice(runtimeSummary.skipped);
+    const claudeRulesSkipNotice = formatClaudeRulesSkipNotice(shouldSkipClaudeRulesDeployment(poolDir, targetFolder));
 
     await promptProfileSelectionAfterInit(context, targetFolder);
 
     if (silent) {
         const autoMsg = `✅ junai agent pipeline auto-initialized (mode: ${mode}).`;
-        vscode.window.showInformationMessage(runtimeSkipNotice ? `${autoMsg} ${runtimeSkipNotice}` : autoMsg);
+        const notices = [runtimeSkipNotice, claudeRulesSkipNotice].filter(Boolean).join(' ');
+        vscode.window.showInformationMessage(notices ? `${autoMsg} ${notices}` : autoMsg);
         return;
     }
 
+    const initNotices = [runtimeSkipNotice, claudeRulesSkipNotice].filter(Boolean).join(' ');
     const open = await vscode.window.showInformationMessage(
-        `✅ junai agent pipeline installed (mode: ${mode}). MCP server configured in .vscode/mcp.json. Open ARTIFACTS.md to get started.${runtimeSkipNotice ? ` ${runtimeSkipNotice}` : ''}`,
+        `✅ junai agent pipeline installed (mode: ${mode}). MCP server configured in .vscode/mcp.json. Open ARTIFACTS.md to get started.${initNotices ? ` ${initNotices}` : ''}`,
         'Open ARTIFACTS.md', 'Dismiss'
     );
     if (open === 'Open ARTIFACTS.md') {
@@ -1053,12 +1075,16 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     let updated = 0;
     let skipped = 0;
     let runtimeSkipNotice = '';
+    let claudeRulesSkipNotice = '';
     const git: { result: GitCommitResult } = { result: 'skipped-no-repo' };
 
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'junai', cancellable: false },
         async (progress) => {
             progress.report({ message: 'Updating agent pool…' });
+
+            const skipClaudeRules = shouldSkipClaudeRulesDeployment(poolDir, workspaceFolders[0].uri.fsPath);
+            claudeRulesSkipNotice = formatClaudeRulesSkipNotice(skipClaudeRules);
 
             const runtimeTemplates: Record<RuntimeName, Omit<RuntimeBundleSpec, 'poolRoot' | 'workspaceRoot'>> = {
                 copilot: {
@@ -1068,7 +1094,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
                     userOwnedFiles: USER_OWNED,
                 },
                 claude: {
-                    cleanDirs: ['skills', 'rules'],
+                    cleanDirs: skipClaudeRules ? ['skills'] : ['skills', 'rules'],
                     mergeDirs: [],
                     rootFiles: [],
                     userOwnedFiles: new Set(),
@@ -1119,6 +1145,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
     else if (git.result === 'skipped-detached')    { msg += ' (git commit skipped — detached HEAD)'; }
     else if (git.result === 'error')               { msg += ' (git commit failed — commit manually if needed)'; }
     if (runtimeSkipNotice)                         { msg += ` ${runtimeSkipNotice}`; }
+    if (claudeRulesSkipNotice)                     { msg += ` ${claudeRulesSkipNotice}`; }
     vscode.window.showInformationMessage(msg);
 }
 
@@ -1155,9 +1182,11 @@ async function cmdInitPool(context: vscode.ExtensionContext): Promise<void> {
     );
 
     const runtimeSkipNotice = formatRuntimeSkipNotice(runtimeSummary.skipped);
+    const claudeRulesSkipNotice = formatClaudeRulesSkipNotice(shouldSkipClaudeRulesDeployment(poolDir, targetFolder));
+    const initPoolNotices = [runtimeSkipNotice, claudeRulesSkipNotice].filter(Boolean).join(' ');
 
     const sel = await vscode.window.showInformationMessage(
-        `junai: Agent pool deployed. Agents and skills are ready — no pipeline-state.json created.${runtimeSkipNotice ? ` ${runtimeSkipNotice}` : ''}`,
+        `junai: Agent pool deployed. Agents and skills are ready — no pipeline-state.json created.${initPoolNotices ? ` ${initPoolNotices}` : ''}`,
         'Select Profile', 'Set Recipe'
     );
     if (sel === 'Select Profile') { vscode.commands.executeCommand('junai.selectProfile'); }
@@ -1237,6 +1266,7 @@ type RuntimeBundleSpec = {
 function installRuntimeBundles(poolDir: string, targetFolder: string): RuntimeInstallSummary {
     const summary: RuntimeInstallSummary = { installed: [], skipped: [] };
     const runtimes = buildRuntimeBundleTargets(poolDir, targetFolder);
+    const skipClaudeRules = shouldSkipClaudeRulesDeployment(poolDir, targetFolder);
 
     for (const runtime of runtimes) {
         if (!runtime.deploy) {
@@ -1244,7 +1274,10 @@ function installRuntimeBundles(poolDir: string, targetFolder: string): RuntimeIn
             continue;
         }
         if (!fs.existsSync(runtime.poolRoot)) { continue; }
-        copyDirSync(runtime.poolRoot, runtime.workspaceRoot);
+        const excludedTopLevelDirs = (runtime.runtimeName === 'claude' && skipClaudeRules)
+            ? new Set(['rules'])
+            : new Set<string>();
+        copyRuntimeBundleRoot(runtime.poolRoot, runtime.workspaceRoot, excludedTopLevelDirs);
         summary.installed.push(runtime.runtimeName);
     }
 
@@ -1304,6 +1337,25 @@ function removeDirIfEmpty(dirPath: string): void {
     if (!fs.existsSync(dirPath)) { return; }
     if (fs.readdirSync(dirPath).length === 0) {
         fs.rmSync(dirPath, { recursive: true, force: true });
+    }
+}
+
+function copyRuntimeBundleRoot(src: string, dest: string, excludedTopLevelDirs: Set<string>): void {
+    if (!fs.existsSync(src)) { return; }
+    fs.mkdirSync(dest, { recursive: true });
+
+    for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+        if (SKIP.has(entry.name)) { continue; }
+        if (entry.isDirectory() && excludedTopLevelDirs.has(entry.name)) { continue; }
+
+        const srcPath = path.join(src, entry.name);
+        const destPath = path.join(dest, entry.name);
+
+        if (entry.isDirectory()) {
+            copyDirSync(srcPath, destPath);
+        } else {
+            fs.copyFileSync(srcPath, destPath);
+        }
     }
 }
 
@@ -1938,11 +1990,13 @@ function gitCommitPoolUpdate(workspaceRoot: string, poolVersion: string | undefi
 
     if (fs.existsSync(claudeDir)) {
         const relClaude = path.relative(gitRoot, claudeDir).split(path.sep).join('/');
-        stagePaths.push(`${relClaude}/agents`, `${relClaude}/skills`, `${relClaude}/rules`);
+        if (fs.existsSync(path.join(claudeDir, 'agents'))) { stagePaths.push(`${relClaude}/agents`); }
+        if (fs.existsSync(path.join(claudeDir, 'skills'))) { stagePaths.push(`${relClaude}/skills`); }
+        if (fs.existsSync(path.join(claudeDir, 'rules'))) { stagePaths.push(`${relClaude}/rules`); }
     }
     if (fs.existsSync(codexDir)) {
         const relCodex = path.relative(gitRoot, codexDir).split(path.sep).join('/');
-        stagePaths.push(`${relCodex}/skills`);
+        if (fs.existsSync(path.join(codexDir, 'skills'))) { stagePaths.push(`${relCodex}/skills`); }
     }
     run(['add', '--', ...stagePaths], gitRoot);
 
