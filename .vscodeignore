@@ -7,6 +7,7 @@ scripts/**
 .gitignore
 .eslintrc.json
 tsconfig.json
+esbuild.mjs
 **/*.map
 **/*.ts
 !out/**/*.js
