@@ -55,7 +55,7 @@ let dreamMemoryService: DreamMemoryService | null = null;
 let proactiveAssistantService: ProactiveAssistantService | null = null;
 
 const ALLOWED_WORKSPACE_RUNTIME_ENTRIES: Record<CleanupRuntimeName, Set<string>> = {
-    claude: new Set(['agents', 'skills', 'rules']),
+    claude: new Set(['skills', 'rules']),
     codex: new Set(['skills']),
 };
 
@@ -73,9 +73,19 @@ function hasUserLevelRuntimeTarget(runtimeName: RuntimeName): boolean {
         case 'copilot':
             return false;
         case 'claude':
-            return fs.existsSync(path.join(home, CLAUDE_RUNTIME_DIR, 'agents'));
+            return dirHasNonDotEntries(path.join(home, CLAUDE_RUNTIME_DIR, 'agents'));
         case 'codex':
-            return fs.existsSync(path.join(home, CODEX_RUNTIME_DIR, 'skills'));
+            return dirHasNonDotEntries(path.join(home, CODEX_RUNTIME_DIR, 'skills'));
+    }
+}
+
+/** Return true only when `dir` exists AND contains at least one non-dotfile entry. */
+function dirHasNonDotEntries(dir: string): boolean {
+    if (!fs.existsSync(dir)) { return false; }
+    try {
+        return fs.readdirSync(dir).some(e => !e.startsWith('.'));
+    } catch {
+        return false;
     }
 }
 
