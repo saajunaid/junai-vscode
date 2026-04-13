@@ -1274,9 +1274,11 @@ function installRuntimeBundles(poolDir: string, targetFolder: string): RuntimeIn
             continue;
         }
         if (!fs.existsSync(runtime.poolRoot)) { continue; }
-        const excludedTopLevelDirs = (runtime.runtimeName === 'claude' && skipClaudeRules)
-            ? new Set(['rules'])
-            : new Set<string>();
+        const excludedTopLevelDirs = new Set<string>();
+        if (runtime.runtimeName === 'claude') {
+            excludedTopLevelDirs.add('agents');
+            if (skipClaudeRules) { excludedTopLevelDirs.add('rules'); }
+        }
         copyRuntimeBundleRoot(runtime.poolRoot, runtime.workspaceRoot, excludedTopLevelDirs);
         summary.installed.push(runtime.runtimeName);
     }
