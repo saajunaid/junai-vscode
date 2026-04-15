@@ -614,6 +614,7 @@ async function cmdInit(context: vscode.ExtensionContext, opts?: { silent?: boole
             scaffoldVscodeSettings(targetFolder);
 
             writeWorkspacePoolVersion(context, githubDir);
+            scaffoldSelectiveGithubGitignore(targetFolder);
             progress.report({ message: 'Done.' });
 
             return summary;
@@ -1138,6 +1139,7 @@ async function cmdUpdate(context: vscode.ExtensionContext, opts?: { silent?: boo
             writeWorkspacePoolVersion(context, githubDir);
             scaffoldMcpConfig(workspaceFolders[0].uri.fsPath);
             scaffoldVscodeSettings(workspaceFolders[0].uri.fsPath);
+            scaffoldSelectiveGithubGitignore(workspaceFolders[0].uri.fsPath);
 
             progress.report({ message: 'Committing pool update…' });
             git.result = gitCommitPoolUpdate(workspaceFolders[0].uri.fsPath, readBundledPoolVersion(context) ?? undefined);
@@ -1186,6 +1188,7 @@ async function cmdInitPool(context: vscode.ExtensionContext): Promise<void> {
             scaffoldMcpConfig(targetFolder);
             scaffoldVscodeSettings(targetFolder);
             writeWorkspacePoolVersion(context, githubDir);
+            scaffoldSelectiveGithubGitignore(targetFolder);
 
             return summary;
         }
@@ -2010,7 +2013,15 @@ function gitCommitPoolUpdate(workspaceRoot: string, poolVersion: string | undefi
         const relCodex = path.relative(gitRoot, codexDir).split(path.sep).join('/');
         if (fs.existsSync(path.join(codexDir, 'skills'))) { stagePaths.push(`${relCodex}/skills`); }
     }
-    run(['add', '--', ...stagePaths], gitRoot);
+
+    // Filter to only paths that exist on disk — git add fails fatally on missing paths
+    const existingStagePaths = stagePaths.filter(p => {
+        const abs = path.isAbsolute(p) ? p : path.join(gitRoot, p);
+        return fs.existsSync(abs);
+    });
+    if (existingStagePaths.length > 0) {
+        run(['add', '--', ...existingStagePaths], gitRoot);
+    }
 
     // 6. Check whether anything was actually staged (exit 0 = no changes)
     if (run(['diff', '--cached', '--quiet'], gitRoot).ok) { return 'nothing-to-commit'; }
@@ -2023,6 +2034,43 @@ function gitCommitPoolUpdate(workspaceRoot: string, poolVersion: string | undefi
     // Retry: user has no global git author configured (common on fresh machines)
     const fallbackEnv = { GIT_AUTHOR_NAME: 'junai', GIT_AUTHOR_EMAIL: 'junai-bot@localhost', GIT_COMMITTER_NAME: 'junai', GIT_COMMITTER_EMAIL: 'junai-bot@localhost' };
     return run(commitArgs, gitRoot, fallbackEnv).ok ? 'committed' : 'error';
+}
+
+/**
+ * Ensures the project's .gitignore contains the junai selective-tracking block
+ * for .github/.  Pool-managed dirs (agents/, skills/, instructions/, etc.) are
+ * ignored; project-owned dirs (agent-docs/, plans/, handoffs/) and key root
+ * files are kept tracked.
+ *
+ * Idempotent — safe to call on every init/update; skips if already present.
+ */
+function scaffoldSelectiveGithubGitignore(workspaceRoot: string): void {
+    const MARKER = '# ── junai: selective .github tracking ──';
+    const gitignorePath = path.join(workspaceRoot, '.gitignore');
+
+    if (fs.existsSync(gitignorePath)) {
+        const existing = fs.readFileSync(gitignorePath, 'utf8');
+        if (existing.includes(MARKER)) { return; }
+    }
+
+    const block = [
+        '',
+        MARKER,
+        '.github/*',
+        '!.github/agent-docs/',
+        '!.github/agent-docs/**',
+        '!.github/plans/',
+        '!.github/plans/**',
+        '!.github/handoffs/',
+        '!.github/handoffs/**',
+        '!.github/copilot-instructions.md',
+        '!.github/project-config.md',
+        '!.github/pipeline-state.json',
+        '.claude/',
+        '',
+    ].join('\n');
+
+    fs.appendFileSync(gitignorePath, block, 'utf8');
 }
 
 function scaffoldPipelineState(githubDir: string, mode: string): void {
