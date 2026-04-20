@@ -19,7 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.DS_Store', '.venv']);
+const SKIP = new Set(['.git', 'node_modules', '__pycache__', '.mypy_cache', '.pytest_cache', '.DS_Store', '.venv']);
 
 const ROOT = path.resolve(__dirname, '..');
 const poolDir = path.join(ROOT, 'pool');
