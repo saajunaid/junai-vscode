@@ -153,7 +153,6 @@ fs.mkdirSync(poolDir, { recursive: true });
 let total = 0;
 const runtimes = [
     { name: 'copilot', folder: '.github' },
-    { name: 'claude', folder: '.claude' },
     { name: 'codex', folder: '.codex' },
 ];
 
