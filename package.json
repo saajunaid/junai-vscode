@@ -1,212 +1,210 @@
 {
-    "name":  "junai",
-    "displayName":  "junai - AI Agent Pipeline",
-    "description":  "Agentic Engineering for GitHub Copilot. 26 specialist agents, 9 MCP tools, deterministic routing, and smart runtime deduplication to prevent duplicate instruction surfaces and context compaction.",
-    "version":  "1.1.4",
-    "publisher":  "junai-labs",
-    "engines":  {
-                    "vscode":  "^1.101.0"
+    "name": "junai",
+    "displayName": "junai - AI Agent Pipeline",
+    "description": "Agentic Engineering for GitHub Copilot. 26 specialist agents, 9 MCP tools, deterministic routing, and smart runtime deduplication to prevent duplicate instruction surfaces and context compaction.",
+    "version": "1.1.5",
+    "publisher": "junai-labs",
+    "engines": {
+        "vscode": "^1.101.0"
+    },
+    "categories": [
+        "AI",
+        "Chat",
+        "Programming Languages",
+        "Other"
+    ],
+    "keywords": [
+        "ai-pipeline",
+        "agent-pipeline",
+        "ai-agent",
+        "agentic",
+        "agentic-engineering",
+        "copilot-agent",
+        "github-copilot",
+        "multi-agent",
+        "llm",
+        "ai-workflow",
+        "workflow-automation",
+        "pipeline",
+        "orchestration",
+        "sdlc",
+        "autonomous",
+        "autopilot",
+        "mcp",
+        "deterministic",
+        "architect",
+        "tester",
+        "code-review"
+    ],
+    "icon": "icon.png",
+    "galleryBanner": {
+        "color": "#0d0f14",
+        "theme": "dark"
+    },
+    "qna": "https://github.com/saajunaid/junai-vscode/issues",
+    "badges": [
+        {
+            "url": "https://img.shields.io/badge/status-beta-orange?style=flat-square",
+            "href": "https://github.com/saajunaid/junai-vscode",
+            "description": "Beta â€” early access, APIs subject to change"
+        }
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/saajunaid/junai-vscode"
+    },
+    "bugs": {
+        "url": "https://github.com/saajunaid/junai-vscode/issues"
+    },
+    "homepage": "https://github.com/saajunaid/junai-vscode#readme",
+    "license": "MIT",
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "junai.init",
+                "title": "Initialize Agent Pipeline",
+                "category": "junai"
+            },
+            {
+                "command": "junai.selectProfile",
+                "title": "Select Project Profile",
+                "category": "junai"
+            },
+            {
+                "command": "junai.status",
+                "title": "Show Pipeline Status",
+                "category": "junai"
+            },
+            {
+                "command": "junai.setMode",
+                "title": "Set Pipeline Mode",
+                "category": "junai"
+            },
+            {
+                "command": "junai.remove",
+                "title": "Remove from this project",
+                "category": "junai"
+            },
+            {
+                "command": "junai.cleanupDuplicateRuntimes",
+                "title": "Clean Up Duplicate Workspace Runtimes",
+                "category": "junai"
+            },
+            {
+                "command": "junai.update",
+                "title": "Update Agent Pool",
+                "category": "junai"
+            },
+            {
+                "command": "junai.initPool",
+                "title": "Initialize Agent Pool",
+                "category": "junai"
+            },
+            {
+                "command": "junai.setRecipe",
+                "title": "Set Recipe",
+                "category": "junai"
+            },
+            {
+                "command": "junai.probeAutopilot",
+                "title": "Probe Autopilot Chat Commands (dry run)",
+                "category": "junai"
+            },
+            {
+                "command": "junai.coordinate",
+                "title": "Run Coordinator Mode (experimental)",
+                "category": "junai"
+            },
+            {
+                "command": "junai.deepPlan",
+                "title": "Deep Plan: Build Structured Plan (experimental)",
+                "category": "junai"
+            }
+        ],
+        "configuration": {
+            "title": "junai",
+            "properties": {
+                "junai.defaultMode": {
+                    "type": "string",
+                    "enum": [
+                        "supervised",
+                        "assisted",
+                        "autopilot"
+                    ],
+                    "default": "supervised",
+                    "description": "Default pipeline mode for new projects. supervised = all gates manual; assisted = manual gates with AI hints; autopilot = all gates auto-satisfied except intent_approved."
                 },
-    "categories":  [
-                       "AI",
-                       "Chat",
-                       "Programming Languages",
-                       "Other"
-                   ],
-    "keywords":  [
-                     "ai-pipeline",
-                     "agent-pipeline",
-                     "ai-agent",
-                     "agentic",
-                     "agentic-engineering",
-                     "copilot-agent",
-                     "github-copilot",
-                     "multi-agent",
-                     "llm",
-                     "ai-workflow",
-                     "workflow-automation",
-                     "pipeline",
-                     "orchestration",
-                     "sdlc",
-                     "autonomous",
-                     "autopilot",
-                     "mcp",
-                     "deterministic",
-                     "architect",
-                     "tester",
-                     "code-review"
-                 ],
-    "icon":  "icon.png",
-    "galleryBanner":  {
-                          "color":  "#0d0f14",
-                          "theme":  "dark"
-                      },
-    "qna":  "https://github.com/saajunaid/junai-vscode/issues",
-    "badges":  [
-                   {
-                       "url":  "https://img.shields.io/badge/status-beta-orange?style=flat-square",
-                       "href":  "https://github.com/saajunaid/junai-vscode",
-                       "description":  "Beta â€” early access, APIs subject to change"
-                   }
-               ],
-    "repository":  {
-                       "type":  "git",
-                       "url":  "https://github.com/saajunaid/junai-vscode"
-                   },
-    "bugs":  {
-                 "url":  "https://github.com/saajunaid/junai-vscode/issues"
-             },
-    "homepage":  "https://github.com/saajunaid/junai-vscode#readme",
-    "license":  "MIT",
-    "activationEvents":  [
-
-                         ],
-    "main":  "./out/extension.js",
-    "contributes":  {
-                        "commands":  [
-                                         {
-                                             "command":  "junai.init",
-                                             "title":  "Initialize Agent Pipeline",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.selectProfile",
-                                             "title":  "Select Project Profile",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.status",
-                                             "title":  "Show Pipeline Status",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.setMode",
-                                             "title":  "Set Pipeline Mode",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.remove",
-                                             "title":  "Remove from this project",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.cleanupDuplicateRuntimes",
-                                             "title":  "Clean Up Duplicate Workspace Runtimes",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.update",
-                                             "title":  "Update Agent Pool",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.initPool",
-                                             "title":  "Initialize Agent Pool",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.setRecipe",
-                                             "title":  "Set Recipe",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.probeAutopilot",
-                                             "title":  "Probe Autopilot Chat Commands (dry run)",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.coordinate",
-                                             "title":  "Run Coordinator Mode (experimental)",
-                                             "category":  "junai"
-                                         },
-                                         {
-                                             "command":  "junai.deepPlan",
-                                             "title":  "Deep Plan: Build Structured Plan (experimental)",
-                                             "category":  "junai"
-                                         }
-                                     ],
-                        "configuration":  {
-                                              "title":  "junai",
-                                              "properties":  {
-                                                                 "junai.defaultMode":  {
-                                                                                           "type":  "string",
-                                                                                           "enum":  [
-                                                                                                        "supervised",
-                                                                                                        "assisted",
-                                                                                                        "autopilot"
-                                                                                                    ],
-                                                                                           "default":  "supervised",
-                                                                                           "description":  "Default pipeline mode for new projects. supervised = all gates manual; assisted = manual gates with AI hints; autopilot = all gates auto-satisfied except intent_approved."
-                                                                                       },
-                                                                 "junai.autoInitializeOnActivation":  {
-                                                                                                          "type":  "string",
-                                                                                                          "enum":  [
-                                                                                                                       "prompt",
-                                                                                                                       "always",
-                                                                                                                       "never"
-                                                                                                                   ],
-                                                                                                          "enumDescriptions":  [
-                                                                                                                                   "Show a notification offering to initialize â€” default behaviour",
-                                                                                                                                   "Silently initialize the agent pipeline the first time a workspace is opened (no prompts, first-time only)",
-                                                                                                                                   "Never auto-initialize or show the welcome prompt on activation"
-                                                                                                                               ],
-                                                                                                          "default":  "prompt",
-                                                                                                          "description":  "Controls automatic agent pipeline initialization when VS Code opens a workspace. prompt = offer with a notification; always = initialize silently on first open; never = suppress all activation prompts."
-                                                                                                      },
-                                                                 "junai.avoidUserLevelRuntimeDuplication":  {
-                                                                                                                "type":  "boolean",
-                                                                                                                "default":  true,
-                                                                                                                "description":  "When enabled, junai skips deploying workspace .claude/.codex runtime bundles if matching user-level runtimes are already present, preventing duplicate agent listings across user and workspace scopes."
-                                                                                                            },
-                                                                 "junai.avoidClaudeRuleDuplication":  {
-                                                                                                          "type":  "boolean",
-                                                                                                          "default":  true,
-                                                                                                          "description":  "When enabled, junai skips deploying workspace .claude/rules whenever .github/instructions is present, preventing duplicated instruction surfaces that can increase context compaction pressure for Claude."
-                                                                                                      },
-                                                                 "junai.promptDuplicateRuntimeCleanup":  {
-                                                                                                             "type":  "boolean",
-                                                                                                             "default":  true,
-                                                                                                             "description":  "When enabled, junai shows a one-time prompt to archive legacy workspace .claude/.codex runtime folders if matching user-level runtimes exist, preventing duplicate agent listings without deleting data."
-                                                                                                         },
-                                                                 "junai.experimental.coordinator":  {
-                                                                                                        "type":  "boolean",
-                                                                                                        "default":  false,
-                                                                                                        "description":  "Enable Coordinator Mode — fan out tasks to parallel workers and synthesize results. Implemented experimental feature."
-                                                                                                    },
-                                                                 "junai.experimental.dream":  {
-                                                                                                  "type":  "boolean",
-                                                                                                  "default":  false,
-                                                                                                  "description":  "Enable Dream Memory Consolidation — quiet, opt-in memory consolidation after significant work/events. Implemented experimental feature."
-                                                                                              },
-                                                                 "junai.experimental.deepPlan":  {
-                                                                                                     "type":  "boolean",
-                                                                                                     "default":  false,
-                                                                                                     "description":  "Enable Deep Plan Mode — structured planning lane for complex tasks with assumptions, risks, phased outline, and approval-ready next action. Implemented experimental feature."
-                                                                                                 },
-                                                                 "junai.experimental.proactive":  {
-                                                                                                      "type":  "boolean",
-                                                                                                      "default":  false,
-                                                                                                      "description":  "Enable KAIROS-lite Proactive Assistant — low-noise, opt-in notifications for meaningful runtime events with dedupe and cooldown. Implemented experimental feature."
-                                                                                                  }
-                                                             }
-                                          }
-                    },
-    "scripts":  {
-                    "vscode:prepublish":  "npm run bundle-pool \u0026\u0026 npm run compile -- --production",
-                    "compile":  "node esbuild.mjs",
-                    "watch":  "node esbuild.mjs --watch",
-                    "bundle-pool":  "node scripts/bundle-pool.js",
-                    "package":  "npx vsce package --no-dependencies",
-                    "publish":  "npx vsce publish --no-dependencies",
-                    "pretest":  "npm run compile",
-                    "typecheck":  "tsc -p ./ --noEmit"
+                "junai.autoInitializeOnActivation": {
+                    "type": "string",
+                    "enum": [
+                        "prompt",
+                        "always",
+                        "never"
+                    ],
+                    "enumDescriptions": [
+                        "Show a notification offering to initialize â€” default behaviour",
+                        "Silently initialize the agent pipeline the first time a workspace is opened (no prompts, first-time only)",
+                        "Never auto-initialize or show the welcome prompt on activation"
+                    ],
+                    "default": "prompt",
+                    "description": "Controls automatic agent pipeline initialization when VS Code opens a workspace. prompt = offer with a notification; always = initialize silently on first open; never = suppress all activation prompts."
                 },
-    "devDependencies":  {
-                            "@types/node":  "^20.0.0",
-                            "@types/vscode":  "^1.101.0",
-                            "@vscode/vsce":  "^3.0.0",
-                            "esbuild":  "^0.25.12",
-                            "typescript":  "^5.3.0",
-                            "fann-core":  "file:../fann-core"
-                        }
+                "junai.avoidUserLevelRuntimeDuplication": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When enabled, junai skips deploying workspace .claude/.codex runtime bundles if matching user-level runtimes are already present, preventing duplicate agent listings across user and workspace scopes."
+                },
+                "junai.avoidClaudeRuleDuplication": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When enabled, junai skips deploying workspace .claude/rules whenever .github/instructions is present, preventing duplicated instruction surfaces that can increase context compaction pressure for Claude."
+                },
+                "junai.promptDuplicateRuntimeCleanup": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When enabled, junai shows a one-time prompt to archive legacy workspace .claude/.codex runtime folders if matching user-level runtimes exist, preventing duplicate agent listings without deleting data."
+                },
+                "junai.experimental.coordinator": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Coordinator Mode — fan out tasks to parallel workers and synthesize results. Implemented experimental feature."
+                },
+                "junai.experimental.dream": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Dream Memory Consolidation — quiet, opt-in memory consolidation after significant work/events. Implemented experimental feature."
+                },
+                "junai.experimental.deepPlan": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Deep Plan Mode — structured planning lane for complex tasks with assumptions, risks, phased outline, and approval-ready next action. Implemented experimental feature."
+                },
+                "junai.experimental.proactive": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable KAIROS-lite Proactive Assistant — low-noise, opt-in notifications for meaningful runtime events with dedupe and cooldown. Implemented experimental feature."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run bundle-pool && npm run compile -- --production",
+        "compile": "node esbuild.mjs",
+        "watch": "node esbuild.mjs --watch",
+        "bundle-pool": "node scripts/bundle-pool.js",
+        "package": "npx vsce package --no-dependencies",
+        "publish": "npx vsce publish --no-dependencies",
+        "pretest": "npm run compile",
+        "typecheck": "tsc -p ./ --noEmit"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/vscode": "^1.101.0",
+        "@vscode/vsce": "^3.0.0",
+        "esbuild": "^0.25.12",
+        "typescript": "^5.3.0",
+        "fann-core": "file:../fann-core"
+    }
 }
