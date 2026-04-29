@@ -4,6 +4,21 @@ All notable changes to the **junai** VS Code extension are documented here.
 
 ---
 
+## [1.1.4] — 2026-04-29
+
+### Pool Updates
+
+- **`context: fork` rollout for skills** — Added `context: fork` frontmatter to 67 tool-calling and artefact-producing skills so long-running/research-heavy workflows run in isolated subagent context without polluting primary chat context.
+- **Pipeline bias reduced by default** — `junai-system.instructions.md` and `advisory-mode.instructions.md` now apply only to explicit pipeline scope (`.github/pipeline-state.json`) with activation gates, preventing unwanted orchestrator behavior in normal coding chats.
+- **`golden-plan` dual-mode behavior** — Updated to support `generic` mode by default and `junai-pipeline` mode only when explicitly requested, plus a required execution-mode banner in generated plans.
+- **Sync hardening for repo cascades** — Improved `sync.ps1` push/pull/export/import flows with destination replacement (prevents nested folder duplication), cache cleanup, stale-folder removal, and safer staging of deletions.
+
+### Validation
+
+- Pool validation remains green for registry and golden-plan checks after the `context: fork` migration (existing known privacy-scan false-positive in historical release notes remains unchanged).
+
+---
+
 ## [0.9.1] — 2026-04-06
 
 ### New Commands
